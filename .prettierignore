@@ -1,0 +1,12 @@
+# Hand-written planning documents keep their own layout.
+.scratch/
+docs/
+BLUEPRINT.md
+CLAUDE.md
+GLOSSARY.md
+
+# Generated files
+pnpm-lock.yaml
+apps/api/src/generated/
+apps/api/prisma/migrations/
+next-env.d.ts

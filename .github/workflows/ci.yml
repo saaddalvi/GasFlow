@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          # A throwaway database that exists only while this job runs.
+          POSTGRES_USER: gasflow
+          POSTGRES_PASSWORD: gasflow
+          POSTGRES_DB: gasflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gasflow -d gasflow -h 127.0.0.1"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    env:
+      TEST_DATABASE_URL: postgresql://gasflow:gasflow@localhost:5432/gasflow_test
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Takes the pnpm version from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Formatting
+        run: pnpm run format:check
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Tests
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build

@@ -1,0 +1,36 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PartyType {
+  shop
+  customer
+  refiller
+  supplier
+
+  @@map("party_type")
+}
+
+model Party {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type      PartyType
+  name      String
+
+  // The agency has exactly one shop.
+  @@unique([type], map: "parties_one_shop", where: raw("type = 'shop'"))
+  @@map("parties")
+}
+
+model Gas {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique
+  sortOrder Int      @map("sort_order")
+
+  @@map("gases")
+}

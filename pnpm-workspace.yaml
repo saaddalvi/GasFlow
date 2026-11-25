@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dependencies allowed to run install scripts. Anything else stays blocked.
+allowBuilds:
+  "@prisma/engines": true
+  esbuild: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true
