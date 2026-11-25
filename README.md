@@ -77,9 +77,22 @@ Do this once for each Clerk instance, in the
 An admin who forgets the password enters their username on the sign-in page,
 chooses **Forgot password?** and follows the code sent to the recovery email.
 
-Until the app has its own Staff screen, add other staff the same way, leaving out
-the email and the metadata. To remove the admin role, delete `role` from the
-public metadata; it counts from the person's next request.
+### Manage staff
+
+Everyone else is added in the app. Admins have a **Staff** screen, where they can:
+
+- add a staff member with a name, username and starting password;
+- set a new password for someone who has forgotten theirs. There are no email
+  invitations or resets for staff, so tell them the password yourself;
+- remove someone's access. This deletes their Clerk account and cannot be undone;
+  their name stays in the app;
+- make someone an admin, which asks for their recovery email, or change an
+  admin's recovery email;
+- remove the admin role, which also removes the recovery email.
+
+The app does not let admins remove their own access or admin role, so that nobody
+locks the agency out by mistake. A recovery email entered here is trusted without
+sending a code to it, so check the spelling.
 
 ## Tests
 
@@ -119,6 +132,8 @@ In the API:
   date in Indian Standard Time, from `today()` in the same file.
 - Accounts and sign-in go only through the `IdentityProvider` in
   `src/identity.ts`; the real one is `src/clerk-identity.ts`.
+- To turn a request down, throw a `Refusal` from `src/refusal.ts` with the status
+  and a message fit to show the person. Check request bodies with `parseRequest`.
 - Tests replace the clock and the identity provider, and nothing else, with the
   stand-ins in `test/support`.
 - `src/auth.ts` requires sign-in for every request and puts the person in

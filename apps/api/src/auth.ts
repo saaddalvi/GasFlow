@@ -1,7 +1,8 @@
 import type { Staff } from "@gasflow/shared";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Database } from "./database";
 import type { IdentityProvider } from "./identity";
+import { Refusal } from "./refusal";
 import { recordStaff } from "./services/staff";
 
 declare module "fastify" {
@@ -25,7 +26,7 @@ export function requireSignIn(
     const person = token ? await identity.verifyToken(token) : null;
     if (!person) {
       reply.header("WWW-Authenticate", "Bearer");
-      return refuse(reply, 401, "Unauthorized", "Sign in to continue.");
+      throw new Refusal(401, "Sign in to continue.");
     }
     request.staff = { ...(await recordStaff(db, person)), isAdmin: person.isAdmin };
   });
@@ -35,15 +36,8 @@ export function requireSignIn(
  * The one way to limit an action to admins. Add it to the route:
  * `app.post(path, { onRequest: adminOnly }, handler)`.
  */
-export async function adminOnly(request: FastifyRequest, reply: FastifyReply) {
-  if (!request.staff.isAdmin) {
-    return refuse(reply, 403, "Forbidden", "Only an admin can do this.");
-  }
-}
-
-/** Answers in the same shape as Fastify's own errors. */
-function refuse(reply: FastifyReply, statusCode: number, error: string, message: string) {
-  return reply.code(statusCode).send({ statusCode, error, message });
+export function adminOnly(request: FastifyRequest, _reply: unknown, done: (error?: Error) => void) {
+  done(request.staff.isAdmin ? undefined : new Refusal(403, "Only an admin can do this."));
 }
 
 function bearerToken(header: string | undefined): string | null {

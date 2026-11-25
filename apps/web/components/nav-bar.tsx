@@ -7,9 +7,20 @@ import { useEffect, useRef } from "react";
 import { SIGN_IN_PATH } from "@/lib/routes";
 import { LogoMark } from "./logo-mark";
 
-const LINKS = [{ href: "/", label: "Gases" }];
+const LINKS = [
+  { href: "/", label: "Gases" },
+  { href: "/staff", label: "Staff", adminOnly: true },
+];
 
-export function NavBar({ shopName, staffName }: { shopName: string; staffName?: string }) {
+export function NavBar({
+  shopName,
+  staffName,
+  isAdmin = false,
+}: {
+  shopName: string;
+  staffName?: string;
+  isAdmin?: boolean;
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
@@ -18,18 +29,18 @@ export function NavBar({ shopName, staffName }: { shopName: string; staffName?: 
           <span className="truncate font-semibold">{shopName}</span>
         </Link>
         <nav aria-label="Main" className="hidden gap-1 md:flex">
-          <NavLinks />
+          <NavLinks isAdmin={isAdmin} />
         </nav>
         <AccountMenu staffName={staffName} />
-        <PhoneMenu staffName={staffName} />
+        <PhoneMenu staffName={staffName} isAdmin={isAdmin} />
       </div>
     </header>
   );
 }
 
-function NavLinks() {
+function NavLinks({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
-  return LINKS.map(({ href, label }) => {
+  return LINKS.filter((link) => isAdmin || !link.adminOnly).map(({ href, label }) => {
     const active = pathname === href;
     return (
       <Link
@@ -66,7 +77,7 @@ function AccountMenu({ staffName }: { staffName?: string }) {
 }
 
 /** The whole navigation, including sign out, behind one button on a phone. */
-function PhoneMenu({ staffName }: { staffName?: string }) {
+function PhoneMenu({ staffName, isAdmin }: { staffName?: string; isAdmin: boolean }) {
   const { ref, close } = useMenu();
 
   return (
@@ -81,7 +92,7 @@ function PhoneMenu({ staffName }: { staffName?: string }) {
       </summary>
       <div className="absolute inset-x-0 top-14 border-b border-slate-200 bg-white p-4 shadow-lg">
         <nav aria-label="Main" className="flex flex-col gap-1" onClick={close}>
-          <NavLinks />
+          <NavLinks isAdmin={isAdmin} />
         </nav>
         <div className="mt-3 border-t border-slate-100 pt-3">
           {staffName && (

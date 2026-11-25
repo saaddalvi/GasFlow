@@ -5,8 +5,8 @@ import { startTestApp } from "./support/test-app";
 
 const ADMIN_ACTION = "/api/test/admin-only";
 
-// No real action is limited to admins yet, so the tests add one that uses the
-// same refusal as every real one will.
+// A route of the tests' own, which uses the same refusal as every real admin
+// action and shows who the API believes is asking.
 function addAdminAction(app: FastifyInstance): void {
   app.post(ADMIN_ACTION, { onRequest: adminOnly }, (request) => ({ actingAs: request.staff }));
 }

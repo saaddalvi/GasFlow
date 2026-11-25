@@ -6,6 +6,7 @@ import type { IdentityProvider } from "./identity";
 import { gasRoutes } from "./routes/gases";
 import { meRoutes } from "./routes/me";
 import { shopRoutes } from "./routes/shop";
+import { staffRoutes } from "./routes/staff";
 import { todayRoutes } from "./routes/today";
 
 /** Everything the app reaches outside itself, so that tests can supply their own. */
@@ -21,6 +22,7 @@ export function buildApp(dependencies: AppDependencies, options: FastifyServerOp
   gasRoutes(app, dependencies);
   meRoutes(app);
   shopRoutes(app, dependencies);
+  staffRoutes(app, dependencies);
   todayRoutes(app, dependencies);
   return app;
 }

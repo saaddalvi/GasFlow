@@ -24,12 +24,15 @@ export async function startTestApp(addRoutes?: (app: FastifyInstance) => void) {
   addRoutes?.(app);
   await app.ready();
 
+  let accounts = 0;
+
   /** Creates a new account and gives the headers its requests would carry. */
   async function signIn({ displayName = "Asha Patil", isAdmin = false } = {}) {
+    accounts += 1;
     const account = await identity.createAccount({
       displayName,
-      username: displayName.toLowerCase().replaceAll(" ", "."),
-      password: "not-checked-by-the-stand-in",
+      username: `signed-in-${accounts}`,
+      password: "a-password-for-tests",
     });
     if (isAdmin) {
       identity.makeAdmin(account.identityId);

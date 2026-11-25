@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import type { Gas } from "@gasflow/shared";
+import { LoadError } from "@/components/load-error";
 import { fetchGases, orNull } from "@/lib/api";
 
 export default async function GasesPage() {
@@ -20,12 +21,9 @@ export default async function GasesPage() {
 function GasList({ gases }: { gases: Gas[] | null }) {
   if (gases === null) {
     return (
-      <p
-        role="alert"
-        className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700"
-      >
+      <LoadError>
         The gases could not be loaded. Check that the API is running, then reload the page.
-      </p>
+      </LoadError>
     );
   }
   if (gases.length === 0) {
