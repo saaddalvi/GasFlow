@@ -29,5 +29,8 @@ test-results/
 # Deployment
 .vercel/
 
+# Clerk
+.clerk/
+
 # OS
 .DS_Store

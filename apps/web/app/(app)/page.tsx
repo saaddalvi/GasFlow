@@ -1,17 +1,10 @@
+import { auth } from "@clerk/nextjs/server";
 import type { Gas } from "@gasflow/shared";
-import { connection } from "next/server";
-import { fetchGases } from "@/lib/api";
+import { fetchGases, orNull } from "@/lib/api";
 
 export default async function GasesPage() {
-  // Ask the API on every visit, not once when the app is built.
-  await connection();
-  const gases = await fetchGases().then(
-    (list) => list.gases,
-    (error: unknown) => {
-      console.error(error);
-      return null;
-    },
-  );
+  await auth.protect();
+  const gases = (await orNull(fetchGases()))?.gases ?? null;
 
   return (
     <div className="space-y-8">

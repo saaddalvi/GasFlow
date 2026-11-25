@@ -34,3 +34,14 @@ model Gas {
 
   @@map("gases")
 }
+
+/// A staff member who has signed in. The row outlives their account, so that
+/// bills can go on showing who entered them. The admin role is not stored here;
+/// the identity provider holds it.
+model Staff {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  identityId  String @unique @map("identity_id")
+  displayName String @map("display_name")
+
+  @@map("staff")
+}

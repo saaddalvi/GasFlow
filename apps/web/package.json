@@ -10,6 +10,7 @@
     "typecheck": "next typegen && tsc"
   },
   "dependencies": {
+    "@clerk/nextjs": "7.10.8",
     "@gasflow/shared": "workspace:*",
     "dotenv-cli": "11.1.0",
     "next": "16.4.6",

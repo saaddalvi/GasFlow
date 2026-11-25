@@ -1,3 +1,5 @@
+/* Clerk's styles sit below Tailwind's utilities, so utilities win. */
+@layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
 
 /* The design tokens from section 3 of the build blueprint. */

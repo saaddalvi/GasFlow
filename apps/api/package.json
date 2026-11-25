@@ -16,6 +16,7 @@
     "test:watch": "dotenv -e ../../.env -- vitest"
   },
   "dependencies": {
+    "@clerk/backend": "3.32.0",
     "@gasflow/shared": "workspace:*",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",

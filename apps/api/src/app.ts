@@ -1,8 +1,10 @@
 import Fastify, { type FastifyServerOptions } from "fastify";
+import { requireSignIn } from "./auth";
 import type { Clock } from "./clock";
 import type { Database } from "./database";
 import type { IdentityProvider } from "./identity";
 import { gasRoutes } from "./routes/gases";
+import { meRoutes } from "./routes/me";
 import { shopRoutes } from "./routes/shop";
 import { todayRoutes } from "./routes/today";
 
@@ -15,7 +17,9 @@ export interface AppDependencies {
 
 export function buildApp(dependencies: AppDependencies, options: FastifyServerOptions = {}) {
   const app = Fastify(options);
+  requireSignIn(app, dependencies);
   gasRoutes(app, dependencies);
+  meRoutes(app);
   shopRoutes(app, dependencies);
   todayRoutes(app, dependencies);
   return app;

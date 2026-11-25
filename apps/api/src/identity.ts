@@ -22,18 +22,3 @@ export interface IdentityProvider {
   resetPassword(identityId: string, newPassword: string): Promise<void>;
   removeAccess(identityId: string): Promise<void>;
 }
-
-/**
- * Stands in until a real provider is connected: it accepts no token and refuses
- * every account change.
- */
-export const unconnectedIdentityProvider: IdentityProvider = {
-  verifyToken: () => Promise.resolve(null),
-  createAccount: refuse,
-  resetPassword: refuse,
-  removeAccess: refuse,
-};
-
-function refuse(): Promise<never> {
-  return Promise.reject(new Error("No identity provider is connected."));
-}

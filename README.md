@@ -7,21 +7,20 @@ with customers, or at refillers.
 - The words used for things: [GLOSSARY.md](GLOSSARY.md)
 - Decisions that are costly to reverse: [docs/adr/](docs/adr/)
 
-> There is no sign-in yet, so the API answers anyone who can reach it. Run it on
-> your own machine only.
-
 ## What you need
 
 - [Node.js](https://nodejs.org) 24 (the version in `.nvmrc`)
 - [pnpm](https://pnpm.io) 11: `npm install --global pnpm@11`
 - [Docker](https://www.docker.com) with Docker Compose, for the local Postgres
+- The publishable and secret keys of the GasFlow application in
+  [Clerk](https://dashboard.clerk.com), from its project owner
 
 ## First run
 
 From a fresh checkout:
 
 ```sh
-cp .env.example .env   # the defaults work as they are
+cp .env.example .env   # then add the two Clerk keys; the rest works as it is
 pnpm install
 pnpm db:up             # starts Postgres and waits until it is ready
 pnpm db:migrate        # creates or updates the tables
@@ -29,8 +28,9 @@ pnpm db:seed           # adds the shop and the starting gases
 pnpm dev               # starts the API and the web app
 ```
 
-Then open <http://localhost:3000>. The page lists the gases, which the web app
-reads from the API on <http://localhost:4000>.
+Then open <http://localhost:3000> and sign in. If nobody has an account yet,
+[create the first admin](#create-the-first-admin). The page after sign-in lists
+the gases, which the web app reads from the API on <http://localhost:4000>.
 
 If a port is already taken, change it in `.env`:
 
@@ -41,6 +41,45 @@ If a port is already taken, change it in `.env`:
 | 5433, Postgres | `POSTGRES_PORT`, `DATABASE_URL`, `TEST_DATABASE_URL` |
 
 After pulling new changes, run `pnpm install` and `pnpm db:migrate` again.
+
+## Staff sign-in
+
+Only staff can use the app. They sign in with a username and password, and there
+is no sign-up: every page but `/sign-in` sends a signed-out visitor there, and the
+API answers `401` to any request without a valid session token.
+
+The Clerk application must be set up as in the spec's
+[Clerk setup](.scratch/gasflow/spec.md#clerk-setup) section. The development
+instance already is.
+
+### Create the first admin
+
+Do this once for each Clerk instance, in the
+[Clerk dashboard](https://dashboard.clerk.com):
+
+1. Open the GasFlow application and choose the instance (development or
+   production).
+2. Under **Users**, choose **Create user** and fill in:
+   - first and last name, which bills will show;
+   - a username of at least 4 characters;
+   - a password of at least 8 characters that has not appeared in a known leak;
+   - **an email address the admin can read**. This is the recovery email, without
+     which a forgotten admin password can only be reset from the dashboard.
+3. Open the new user. Under **Metadata**, edit **Public** to the following and
+   save:
+
+   ```json
+   { "role": "admin" }
+   ```
+
+4. Sign in to the app with that username and password.
+
+An admin who forgets the password enters their username on the sign-in page,
+chooses **Forgot password?** and follows the code sent to the recovery email.
+
+Until the app has its own Staff screen, add other staff the same way, leaving out
+the email and the metadata. To remove the admin role, delete `role` from the
+public metadata; it counts from the person's next request.
 
 ## Tests
 
@@ -79,9 +118,11 @@ In the API:
 - The current time comes only from the `Clock` in `src/clock.ts`. "Today" is the
   date in Indian Standard Time, from `today()` in the same file.
 - Accounts and sign-in go only through the `IdentityProvider` in
-  `src/identity.ts`.
-- Tests replace those two, and nothing else, with the stand-ins in
-  `test/support`.
+  `src/identity.ts`; the real one is `src/clerk-identity.ts`.
+- Tests replace the clock and the identity provider, and nothing else, with the
+  stand-ins in `test/support`.
+- `src/auth.ts` requires sign-in for every request and puts the person in
+  `request.staff`. Limit a route to admins with `{ onRequest: adminOnly }`.
 
 ## Changing the database
 

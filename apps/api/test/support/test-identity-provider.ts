@@ -31,8 +31,30 @@ export class TestIdentityProvider implements IdentityProvider {
     return Promise.resolve();
   }
 
+  /** Gives an account the admin role. */
+  makeAdmin(identityId: string): void {
+    this.account(identityId).isAdmin = true;
+  }
+
+  removeAdmin(identityId: string): void {
+    this.account(identityId).isAdmin = false;
+  }
+
+  /** Changes the name the provider holds for an account. */
+  rename(identityId: string, displayName: string): void {
+    this.account(identityId).displayName = displayName;
+  }
+
   /** The token a signed-in person's requests would carry. */
   sessionToken(identityId: string): string {
     return `${TOKEN_PREFIX}${identityId}`;
+  }
+
+  private account(identityId: string): Identity {
+    const account = this.accounts.get(identityId);
+    if (!account) {
+      throw new Error(`No account ${identityId}`);
+    }
+    return account;
   }
 }
