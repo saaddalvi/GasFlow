@@ -40,5 +40,5 @@ Checked so far:
 For the project owner to decide:
 
 - Sign-in uses Clerk's component, as the blueprint says, so it asks for the username first and the password next. Its card shows "Secured by Clerk".
-- The desktop user menu includes Clerk's "Manage account", where staff can change their own name, which bills will show. Check whether Clerk also lets them delete their account.
+- The user menu now offers only sign out; "Manage account" was removed on the project owner's request. The development instance still lets signed-in people delete their own account through Clerk (`delete_self`), and has not been checked for name changes. Decide whether to turn these off in Clerk.
 - The picture of six cylinders is a drawing; there is no photo.

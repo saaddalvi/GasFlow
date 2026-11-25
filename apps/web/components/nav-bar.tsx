@@ -1,6 +1,6 @@
 "use client";
 
-import { SignOutButton, UserButton } from "@clerk/nextjs";
+import { SignOutButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -20,10 +20,7 @@ export function NavBar({ shopName, staffName }: { shopName: string; staffName?: 
         <nav aria-label="Main" className="hidden gap-1 md:flex">
           <NavLinks />
         </nav>
-        <div className="ml-auto hidden items-center gap-3 md:flex">
-          {staffName && <span className="text-sm text-slate-600">{staffName}</span>}
-          <UserButton />
-        </div>
+        <AccountMenu staffName={staffName} />
         <PhoneMenu staffName={staffName} />
       </div>
     </header>
@@ -49,31 +46,31 @@ function NavLinks() {
   });
 }
 
-/** The whole navigation, including sign out, behind one button on a phone. */
-function PhoneMenu({ staffName }: { staffName?: string }) {
-  const menu = useRef<HTMLDetailsElement>(null);
-
-  function close() {
-    menu.current?.removeAttribute("open");
-  }
-
-  useEffect(() => {
-    function closeOnOutsideClick(event: PointerEvent) {
-      if (!menu.current?.contains(event.target as Node)) close();
-    }
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") close();
-    }
-    document.addEventListener("pointerdown", closeOnOutsideClick);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, []);
+/** Sign out, behind the staff member's name, on a wider screen. */
+function AccountMenu({ staffName }: { staffName?: string }) {
+  const { ref } = useMenu();
 
   return (
-    <details ref={menu} className="ml-auto md:hidden">
+    <details ref={ref} className="relative ml-auto hidden md:block">
+      <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
+        <span className="max-w-48 truncate">{staffName ?? "Account"}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 fill-none stroke-current">
+          <path d="m6 9 6 6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </summary>
+      <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+        <SignOut />
+      </div>
+    </details>
+  );
+}
+
+/** The whole navigation, including sign out, behind one button on a phone. */
+function PhoneMenu({ staffName }: { staffName?: string }) {
+  const { ref, close } = useMenu();
+
+  return (
+    <details ref={ref} className="ml-auto md:hidden">
       <summary
         aria-label="Menu"
         className="flex size-11 cursor-pointer list-none items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 [&::-webkit-details-marker]:hidden"
@@ -87,17 +84,51 @@ function PhoneMenu({ staffName }: { staffName?: string }) {
           <NavLinks />
         </nav>
         <div className="mt-3 border-t border-slate-100 pt-3">
-          {staffName && <p className="px-3 text-sm text-slate-500">Signed in as {staffName}</p>}
-          <SignOutButton redirectUrl={SIGN_IN_PATH}>
-            <button
-              type="button"
-              className="mt-1 w-full rounded-md px-3 py-3 text-left text-sm text-slate-600 hover:bg-slate-100"
-            >
-              Sign out
-            </button>
-          </SignOutButton>
+          {staffName && (
+            <p className="mb-1 px-3 text-sm text-slate-500">Signed in as {staffName}</p>
+          )}
+          <SignOut />
         </div>
       </div>
     </details>
   );
+}
+
+function SignOut() {
+  return (
+    <SignOutButton redirectUrl={SIGN_IN_PATH}>
+      <button
+        type="button"
+        className="w-full rounded-md px-3 py-3 text-left text-sm text-slate-600 hover:bg-slate-100"
+      >
+        Sign out
+      </button>
+    </SignOutButton>
+  );
+}
+
+/** For a `<details>` menu: closes it on Escape or a click elsewhere. */
+function useMenu() {
+  const ref = useRef<HTMLDetailsElement>(null);
+
+  function close() {
+    ref.current?.removeAttribute("open");
+  }
+
+  useEffect(() => {
+    function closeOnOutsideClick(event: PointerEvent) {
+      if (!ref.current?.contains(event.target as Node)) close();
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") close();
+    }
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
+  return { ref, close };
 }
