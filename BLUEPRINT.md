@@ -3,6 +3,8 @@
 
 ## READ THIS FIRST (instructions for Claude Code)
 
+> **Read [the decisions spec](.scratch/gasflow/spec.md) before anything else.** It records decisions agreed on 26 November 2026 and **overrides this blueprint wherever they conflict**, including section 0, section 10 and the ground rules below. Use the domain terms in [GLOSSARY.md](GLOSSARY.md), and see [docs/adr/](docs/adr/) for the reasons behind the decisions that are costly to reverse.
+
 You are building a new web application from this document. It is modelled on an existing product (GasPack Counts), but the **owner's changes in section 0 and the stack in section 10 override everything else**. Sections 1 to 9 describe the original product for reference; where they mention Django, HTMX, a warehouse/godown, internal transfers or a Return-from-customer bill form, ignore that and follow sections 0 and 10.
 
 Ground rules:
