@@ -54,3 +54,16 @@ For later tickets:
 - The project owner asked for the ticket to be marked completed. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
 - The two new migrations had not been applied to the development database when this was written. Run `pnpm db:migrate` before using refiller bills there.
 - The decisions listed for the project owner are not recorded as settled.
+
+**26 November 2026: checks run in a browser. All passed except the real phone, which is still to do.**
+
+Run in headless Chrome through the Playwright MCP, signed in with real Clerk development accounts: an admin set the start date and the shop's opening stock, and a staff account entered the refiller bills. The app and the development database were copies, and the figures were made up, not taken from paper copies.
+
+- **A send and a return, then Bills and the Stock report: passed.** The shop started with 20 filled and 15 empty medical oxygen. After sending 12 empty (S-101) and receiving 9 filled (R-501), **Bills** listed both with the right from and to, and the Stock report showed 29 filled, 3 empty, 3 at the refiller and a total of 35.
+- **+ New halfway through a bill: passed.** The new refiller was selected, and the type, paper kind, bill number, line and notes stayed as typed.
+- **Used numbers: passed.** A send with S-101 and a return from refiller with R-501 each showed a warning with a link to the earlier bill while typing, and saving was refused. S-101 typed in lower case with spaces around it was warned about too.
+- **A real phone: still to do.** As a stand-in, Chrome emulated a phone 390 wide with touch. A send (S-102) saved, the Stock report then showed 1 empty, 5 at the refiller and a total of 35, and neither the form nor the saved bill scrolled sideways. A real keyboard and Safari have not been tried.
+
+Found during the checks, not changed:
+
+- After a refused save, the message above **Save bill** stays until the next save. With the paper kind changed to Cash memo it still read "Bill number S-101 is already in use.", although the warning under the number had cleared. This comes from the form component that screens share (`ActionForm`), which is older than this ticket.
