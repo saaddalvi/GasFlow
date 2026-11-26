@@ -43,3 +43,21 @@ For later tickets:
 
 - Parties, vehicles and gases are listed without inactive or retired ones unless asked. New entries must also refuse one named directly in a request.
 - The database needs the `citext` extension, which the migrations create. Confirm this works on Neon at go-live.
+
+**26 November 2026: checked in the running local app, signed in through Clerk as an admin.** A script drove a headless Chromium browser against the development instance and database, at the code in `4166252`. All 70 checks passed. The one browser error was the expected "not found" for a party that does not exist.
+
+- Sign-in and sign-out, and signed-out visits being sent to sign in.
+- Gases: add, rename, retire and bring back; duplicate and blank names refused; a retired gas is not offered.
+- Parties: add a customer, refiller and supplier; automatic abbreviations; edit, deactivate and make active; search and type filter; refusals; the shop cannot be changed and "warehouse" is refused.
+- Vehicles: add as active or inactive, edit and make active; a blank plate refused.
+- Saving a party or vehicle edit kept a change made through the API while the form was open.
+- Staff screen, whose shared parts this ticket changed: the list loads, a password can be shown and hidden, the password and recovery email boxes open, and a taken username and a short password are refused. No account was added or changed.
+- No sideways page scroll at phone or tablet width on the gases, parties, add party, party, edit party, vehicles and staff pages.
+- After a refusal from the server, the button reads "Saving…" for about a second longer while the page reloads. It does not stick.
+
+The test parties, vehicles and gas were then deleted from the development database, as the app cannot delete them.
+
+Still to do:
+
+- Sign in as a staff member who is not an admin. Check that they can add and edit parties and vehicles, that the Gases page offers no changes and that there is no Staff screen.
+- Check by hand in the browsers and on the phones the agency will use. Safari, Firefox, a real phone and a production build have not been tried.
