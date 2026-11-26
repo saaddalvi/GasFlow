@@ -58,3 +58,19 @@ For later tickets:
 - Ticket 12: corrections have the same permission rule as `whyNotCancel`. `cancelBill` reads the bill's parties before locking one, which is safe only while a bill's parties never change. A correction that changes the customer has to allow for that.
 - Ticket 14: `refuseWhileReturnedAgainst` and its message speak of returns only, and would name a write-off as one.
 - Ticket 17: cancelling is allowed for an inactive party, which can leave one holding cylinders.
+
+**27 November 2026: checks run in a browser. All passed. A real phone is still to do.**
+
+Run in headless Chrome through the Playwright MCP against commit `888c307`, signed in with real Clerk development accounts (`admin` and `test1`). The app and the database were copies, and the figures were made up. Most test data was created through the API; the cancelling, the new bill, the new opening stock, the filter and Undo were done on screen.
+
+- **Staff cancel a bill entered today: passed.** No confirmation opens without a reason. The bill then showed the reason, notes, who and when, and the Stock report no longer counted it.
+- **Permissions: passed.** Staff were offered no **Cancel bill** on the admin's bill or on one entered the day before, and the API refused both. The admin was offered it on both. The older bill was made by moving its entry time back a day in the copy.
+- **A dispatch bill with a return: passed.** It was refused with a link to the return. After the return was cancelled, the bill showed all its cylinders pending and could be cancelled.
+- **Number reuse: passed.** A new bill took the cancelled bill's number with no warning.
+- **Admin cancels opening stock and enters it again: passed.** Staff were not offered it. The customer could be chosen again, and the Stock report followed both changes.
+- **Status filter: passed** for posted, cancelled and reset.
+- **Undo on a phone: passed on an emulated phone** (touch, 390 wide). Undo was in view with no sideways scrolling, the pending cylinders came back, and the return showed the reason data entry error. Left alone, Undo went after about 10 seconds.
+
+No page errors were raised. The console showed only a missing `favicon.ico` and Clerk's development keys warning.
+
+Still to do: Receive empties and **Undo** on a real phone. Safari and Firefox have not been tried.
