@@ -48,3 +48,9 @@ For later tickets:
 - Ticket 08: the optional slip number on a customer return is the glossary's "Slip number" and needs its own field. Names beginning `refillerSlipNumber` refer to the bill number of a return from refiller.
 - Ticket 12: both number warnings have to leave out the bill being corrected. A correction has to keep the rules in `NAMED_PARTY` in the ledger.
 - Tickets 12 and 13: a form line has no fill state until one is chosen, so `LineList` and `asNewLines` take the default.
+
+**26 November 2026: completed** in commit `461d9dd`. It is pushed; the CI result has not been checked.
+
+- The project owner asked for the ticket to be marked completed. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
+- The two new migrations had not been applied to the development database when this was written. Run `pnpm db:migrate` before using refiller bills there.
+- The decisions listed for the project owner are not recorded as settled.
