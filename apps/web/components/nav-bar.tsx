@@ -4,11 +4,12 @@ import { SignOutButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { OPENING_STOCK_PATH, SIGN_IN_PATH } from "@/lib/routes";
+import { BILLS_PATH, OPENING_STOCK_PATH, SIGN_IN_PATH } from "@/lib/routes";
 import { LogoMark } from "./logo-mark";
 
 const LINKS = [
   { href: "/", label: "Gases" },
+  { href: BILLS_PATH, label: "Bills" },
   { href: "/parties", label: "Parties" },
   { href: "/vehicles", label: "Vehicles" },
   { href: OPENING_STOCK_PATH, label: "Opening stock" },
@@ -44,9 +45,12 @@ export function NavBar({
 
 function NavLinks({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
+  // A link stays marked on the pages under it, unless another link is closer.
+  const current = LINKS.map((link) => link.href)
+    .filter((href) => pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)))
+    .sort((a, b) => b.length - a.length)[0];
   return LINKS.filter((link) => isAdmin || !link.adminOnly).map(({ href, label }) => {
-    // A link stays marked on the pages under it.
-    const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+    const active = href === current;
     return (
       <Link
         key={href}

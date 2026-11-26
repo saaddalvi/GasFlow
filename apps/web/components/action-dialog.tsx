@@ -1,19 +1,29 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useImperativeHandle, useRef, useState } from "react";
 import { ActionForm, type ActionFormProps } from "./action-form";
 import { buttonStyles } from "./button-styles";
 
-/** A button that opens a box asking for, or confirming, one change. */
+/** For opening a box from elsewhere. */
+export interface ActionDialogHandle {
+  open: () => void;
+}
+
+/** A box asking for, or confirming, one change, and usually a button that opens it. */
 export function ActionDialog({
+  ref,
   trigger,
   title,
   description,
   onOpen,
   ...form
 }: Omit<ActionFormProps, "onCancel" | "onDone"> & {
-  /** The words on the button that opens the box. */
-  trigger: string;
+  ref?: React.Ref<ActionDialogHandle>;
+  /**
+   * The words on the button that opens the box. Left out, there is no button, as
+   * for a box that must sit outside the form its button is in.
+   */
+  trigger?: string;
   title: string;
   description: string;
   /** Called each time the box is opened. */
@@ -31,11 +41,15 @@ export function ActionDialog({
     dialog.current?.showModal();
   }
 
+  useImperativeHandle(ref, () => ({ open }));
+
   return (
     <>
-      <button type="button" onClick={open} className={buttonStyles.secondary}>
-        {trigger}
-      </button>
+      {trigger && (
+        <button type="button" onClick={open} className={buttonStyles.secondary}>
+          {trigger}
+        </button>
+      )}
       <dialog
         ref={dialog}
         aria-labelledby={titleId}

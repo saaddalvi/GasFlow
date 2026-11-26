@@ -1,16 +1,18 @@
 import { auth } from "@clerk/nextjs/server";
-import type { Bill, BillParty } from "@gasflow/shared";
+import { PAPER_KIND_NAMES, type Bill, type BillParty } from "@gasflow/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BillStatusTag } from "@/components/bill-status-tag";
+import { buttonStyles } from "@/components/button-styles";
 import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
-import { Tag } from "@/components/tag";
 import { fetchBill, orNull } from "@/lib/api";
 import { BILL_TYPE_NAMES, FILL_STATE_NAMES } from "@/lib/bill-names";
 import { formatDate, formatMoment } from "@/lib/dates";
 import { BILL_PARTY_TYPE_NAMES } from "@/lib/party-types";
-import { OPENING_STOCK_PATH } from "@/lib/routes";
+import { BILLS_PATH, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
+import { vehicleName } from "@/lib/vehicle-names";
 
 export const metadata: Metadata = {
   title: "Bill · GasFlow",
@@ -38,15 +40,23 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             {BILL_TYPE_NAMES[bill.type]} · {formatDate(bill.date)}
-            <Tag colour={bill.status === "posted" ? "green" : "grey"}>
-              {bill.status === "posted" ? "Posted" : "Cancelled"}
-            </Tag>
+            <BillStatusTag status={bill.status} />
           </span>
         }
       >
-        <Link href={OPENING_STOCK_PATH} className="text-sm text-brand-700 hover:underline">
-          All opening stock
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          {bill.type === "opening_stock" && (
+            <Link href={OPENING_STOCK_PATH} className="text-sm text-brand-700 hover:underline">
+              All opening stock
+            </Link>
+          )}
+          <Link href={BILLS_PATH} className="text-sm text-brand-700 hover:underline">
+            All bills
+          </Link>
+          <Link href={NEW_BILL_PATH} className={buttonStyles.secondary}>
+            + New bill
+          </Link>
+        </div>
       </PageHeading>
       <Details bill={bill} />
       <Lines lines={bill.lines} />
@@ -54,11 +64,19 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
   );
 }
 
-function Details({ bill: { from, to, enteredBy, enteredAt } }: { bill: Bill }) {
+function Details({
+  bill: { paperKind, from, to, vehicle, notes, enteredBy, enteredAt },
+}: {
+  bill: Bill;
+}) {
   const details = [
+    ["Paper kind", paperKind && PAPER_KIND_NAMES[paperKind]],
     ["From", from && <PartyName party={from} />],
     // Opening stock names only the party that held it.
     [from ? "To" : "Party", to && <PartyName party={to} />],
+    ["Vehicle", vehicle && vehicleName(vehicle)],
+    // Kept on the lines it was typed on.
+    ["Notes", notes && <span className="whitespace-pre-line">{notes}</span>],
     ["Entered by", enteredBy.displayName],
     ["Entered at", formatMoment(enteredAt)],
   ] as const;

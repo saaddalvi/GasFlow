@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default async function VehiclesPage() {
   await auth.protect();
-  const list = await orNull(fetchVehicles());
+  const list = await orNull(fetchVehicles({ inactive: true }));
 
   return (
     <div className="space-y-8">

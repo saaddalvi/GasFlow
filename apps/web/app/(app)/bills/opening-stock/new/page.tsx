@@ -16,7 +16,7 @@ import {
 } from "@/lib/api";
 import { formatDate, formatMoment } from "@/lib/dates";
 import { BILL_PARTY_TYPE_NAMES } from "@/lib/party-types";
-import { OPENING_STOCK_PATH } from "@/lib/routes";
+import { billPath, OPENING_STOCK_PATH } from "@/lib/routes";
 import { OpeningStockForm } from "./opening-stock-form";
 import { StartDateDialog } from "./start-date-dialog";
 
@@ -172,7 +172,7 @@ function Table({ list: { entries, total, page, pageSize } }: { list: OpeningStoc
                   <span className="block text-slate-500">{formatMoment(entry.enteredAt)}</span>
                 </td>
                 <td className="px-5 py-3 text-right">
-                  <Link href={`/bills/${entry.id}`} className="text-brand-700 hover:underline">
+                  <Link href={billPath(entry.id)} className="text-brand-700 hover:underline">
                     View<span className="sr-only"> {entry.party.name}</span>
                   </Link>
                 </td>

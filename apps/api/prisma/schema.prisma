@@ -77,12 +77,14 @@ model Vehicle {
   plate  String  @db.Citext
   label  String?
   active Boolean @default(true)
+  bills  Bill[]
 
   @@map("vehicles")
 }
 
 enum BillType {
   opening_stock
+  dispatch
 
   @@map("bill_type")
 }
@@ -102,28 +104,45 @@ enum FillState {
   @@map("fill_state")
 }
 
+/// The kind of paper a bill was written on. Numbers are unique within one.
+enum PaperKind {
+  bill
+  cash_memo
+
+  @@map("paper_kind")
+}
+
 /// A dated record of cylinders moving between parties, or joining or leaving the
 /// business. Only the bill ledger changes bills. Only posted ones count.
 model Bill {
   id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   type        BillType
-  number      String
+  /// Case-insensitive, so that no two paper numbers differ only in capitals.
+  number      String     @db.Citext
+  /// Set on bills numbered from the agency's own paper, and only on those.
+  paperKind   PaperKind? @map("paper_kind")
   date        DateTime   @db.Date
   status      BillStatus @default(posted)
   /// Whom the cylinders leave. Null when they join the business.
   fromPartyId String?    @map("from_party_id") @db.Uuid
   /// Who receives them. Null when they leave the business.
   toPartyId   String?    @map("to_party_id") @db.Uuid
+  vehicleId   String?    @map("vehicle_id") @db.Uuid
+  notes       String?
   enteredById String     @map("entered_by_id") @db.Uuid
   enteredAt   DateTime   @map("entered_at") @db.Timestamptz(3)
   fromParty   Party?     @relation("bills_from", fields: [fromPartyId], references: [id], onDelete: Restrict)
   toParty     Party?     @relation("bills_to", fields: [toPartyId], references: [id], onDelete: Restrict)
+  vehicle     Vehicle?   @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   enteredBy   Staff      @relation(fields: [enteredById], references: [id])
   lines       BillLine[]
 
   // A party has one opening stock. A cancelled one makes way for another.
   @@unique([toPartyId], map: "bills_one_opening_stock_per_party", where: raw("type = 'opening_stock' AND status = 'posted'"))
-  @@index([date])
+  // No two bills on one paper kind share a number, in any year. A cancelled one
+  // frees its number.
+  @@unique([paperKind, number], map: "bills_one_number_per_paper_kind", where: raw("status = 'posted'"))
+  @@index([date, enteredAt])
   @@index([fromPartyId])
   @@index([toPartyId])
   @@map("bills")

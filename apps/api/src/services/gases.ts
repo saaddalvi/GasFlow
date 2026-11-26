@@ -1,6 +1,5 @@
 import type { Gas, GasChanges, GasListQuery, NewGas } from "@gasflow/shared";
-import type { Database } from "../database";
-import { Prisma } from "../generated/prisma/client";
+import { isRepeat, type Database } from "../database";
 import { Refusal } from "../refusal";
 
 /** Gases in the order they were added, the starting ones first. */
@@ -41,7 +40,7 @@ async function refusingTakenName<T>(save: PromiseLike<T>): Promise<T> {
     return await save;
   } catch (error) {
     // A gas's name is the one unique thing a save can collide on.
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (isRepeat(error)) {
       throw new Refusal(409, "There is already a gas with that name. It may be a retired one.");
     }
     throw error;

@@ -136,7 +136,8 @@ In the API:
 - Accounts and sign-in go only through the `IdentityProvider` in
   `src/identity.ts`; the real one is `src/clerk-identity.ts`.
 - Only the bill ledger, `src/services/ledger.ts`, changes bills. Each of its
-  operations checks the rules and writes in one transaction.
+  operations checks the rules and writes in one transaction. The database keeps
+  bill numbers unique on each paper kind, ignoring cancelled bills.
 - Reports only read. They work every figure out from posted bills, and no stock
   count is stored.
 - A calendar date is text such as `2026-11-26`; `src/database-date.ts` converts

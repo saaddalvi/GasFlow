@@ -11,7 +11,7 @@ type Control<Element extends "input" | "select" | "textarea"> = Omit<
   hint?: string;
 };
 
-const controlStyles =
+export const controlStyles =
   "min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base placeholder:text-slate-400 sm:text-sm";
 
 /** A labelled input. Required ones are marked with a star. */
@@ -98,7 +98,8 @@ export function NewPasswordField({ label, ...input }: Omit<Control<"input">, "hi
   );
 }
 
-function Labelled({
+/** A label and hint around a control, for one that none of the fields above covers. */
+export function Labelled({
   label,
   hint,
   required,

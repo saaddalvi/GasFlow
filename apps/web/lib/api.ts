@@ -1,5 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import {
+  billListSchema,
+  billNumberUseSchema,
   billSchema,
   gasListSchema,
   openingStockListSchema,
@@ -15,6 +17,10 @@ import {
   todaySchema,
   vehicleListSchema,
   type Bill,
+  type BillList,
+  type BillListQuery,
+  type BillNumberUse,
+  type BillNumberUseQuery,
   type GasList,
   type OpeningStockList,
   type OpeningStockListQuery,
@@ -57,6 +63,17 @@ export async function fetchBill(billId: string): Promise<Bill | undefined> {
   return found === undefined ? undefined : billSchema.parse(found);
 }
 
+export async function fetchBills({ page }: BillListQuery): Promise<BillList> {
+  return billListSchema.parse(await getJson(`/api/bills?page=${page}`));
+}
+
+/** Which bill, if any, already has this number on this paper kind. */
+export async function fetchNumberUse(query: BillNumberUseQuery): Promise<BillNumberUse> {
+  return billNumberUseSchema.parse(
+    await getJson(`/api/bills/number-use?${new URLSearchParams(query).toString()}`),
+  );
+}
+
 export async function fetchStartDate(): Promise<StartDate> {
   return startDateSchema.parse(await getJson("/api/start-date"));
 }
@@ -83,9 +100,9 @@ export async function fetchToday(): Promise<string> {
   return todaySchema.parse(await getJson("/api/today")).date;
 }
 
-/** Every vehicle, inactive ones too. */
-export async function fetchVehicles(): Promise<VehicleList> {
-  return vehicleListSchema.parse(await getJson("/api/vehicles?inactive=true"));
+/** The vehicles in use, and the inactive ones too if asked for. */
+export async function fetchVehicles({ inactive = false } = {}): Promise<VehicleList> {
+  return vehicleListSchema.parse(await getJson(`/api/vehicles?inactive=${inactive}`));
 }
 
 export async function fetchShop(): Promise<Shop> {

@@ -1,5 +1,16 @@
 /** The one page open to someone who is not signed in. */
 export const SIGN_IN_PATH = "/sign-in";
 
+/** Every bill, a page at a time. */
+export const BILLS_PATH = "/bills";
+
+/** Where a bill copied from the agency's paper is entered. */
+export const NEW_BILL_PATH = "/bills/new";
+
+/** The page of one bill. */
+export function billPath(billId: string): string {
+  return `${BILLS_PATH}/${billId}`;
+}
+
 /** Where opening stock is entered and listed. */
 export const OPENING_STOCK_PATH = "/bills/opening-stock/new";

@@ -1,12 +1,21 @@
-import type { NewBillLine, NewOpeningStock, Staff } from "@gasflow/shared";
+import {
+  PAPER_KIND_NAMES,
+  type NewBillLine,
+  type NewDispatch,
+  type NewOpeningStock,
+  type PaperKind,
+  type Staff,
+} from "@gasflow/shared";
 import type { Clock } from "../clock";
-import type { Database, Transaction } from "../database";
+import { isRepeat, type Database, type Transaction } from "../database";
 import { toDatabaseDate } from "../database-date";
 import { Refusal } from "../refusal";
 import { POSTED_OPENING_STOCK } from "./bills";
 import { noSuchGas } from "./gases";
 import { noSuchParty } from "./parties";
 import { getStartDate } from "./setup";
+import { getShop } from "./shop";
+import { noSuchVehicle } from "./vehicles";
 
 // The bill ledger: the one place that changes bills. Each operation checks every
 // rule and writes inside a single transaction, so that a bill is saved whole or
@@ -29,7 +38,7 @@ export function enterOpeningStock(
       throw new Refusal(409, "A supplier holds no cylinders, so it has no opening stock.");
     }
     if (!party.active) {
-      throw new Refusal(409, `${party.name} is inactive. Make it active first.`);
+      throw inactiveRefusal(party.name);
     }
     await refuseUnusableGases(tx, lines);
     const existing = await tx.bill.findFirst({
@@ -50,12 +59,88 @@ export function enterOpeningStock(
         toPartyId: partyId,
         enteredById: staff.id,
         enteredAt: clock.now(),
-        lines: { create: lines.map((line, index) => ({ ...line, lineNo: index + 1 })) },
+        lines: { create: numbered(lines) },
       },
       select: { id: true },
     });
     return bill.id;
   });
+}
+
+/**
+ * Records cylinders leaving the shop for a customer, and gives the new bill's id.
+ * The shop may be recorded as holding fewer than are sent.
+ */
+export function enterDispatch(
+  db: Database,
+  clock: Clock,
+  staff: Staff,
+  { type, paperKind, number, date, customerId, vehicleId, notes, lines }: NewDispatch,
+): Promise<string> {
+  const save = db.$transaction(async (tx) => {
+    await refuseUnrecordedDate(tx, date);
+    const customer = await lockParty(tx, customerId);
+    if (customer.type !== "customer") {
+      throw new Refusal(409, `${customer.name} is not a customer. A dispatch goes to a customer.`);
+    }
+    if (!customer.active) {
+      throw inactiveRefusal(customer.name);
+    }
+    if (vehicleId) {
+      await refuseUnusableVehicle(tx, vehicleId);
+    }
+    await refuseUnusableGases(tx, lines);
+    const shop = await getShop(tx);
+    const bill = await tx.bill.create({
+      data: {
+        type,
+        paperKind,
+        number,
+        date: toDatabaseDate(date),
+        fromPartyId: shop.id,
+        toPartyId: customerId,
+        vehicleId,
+        notes,
+        enteredById: staff.id,
+        enteredAt: clock.now(),
+        lines: { create: numbered(lines) },
+      },
+      select: { id: true },
+    });
+    return bill.id;
+  });
+  return refusingTakenNumber(paperKind, number, save);
+}
+
+/**
+ * The database keeps the numbers on each paper kind apart, even between saves at
+ * once. A new bill and its lines can repeat nothing else.
+ */
+async function refusingTakenNumber<T>(
+  paperKind: PaperKind,
+  number: string,
+  save: Promise<T>,
+): Promise<T> {
+  try {
+    return await save;
+  } catch (error) {
+    if (isRepeat(error)) {
+      throw new Refusal(409, `${PAPER_KIND_NAMES[paperKind]} number ${number} is already in use.`);
+    }
+    throw error;
+  }
+}
+
+/** Refuses a date that the records do not cover. */
+async function refuseUnrecordedDate(tx: Transaction, date: string): Promise<void> {
+  const startDate = await getStartDate(tx);
+  if (!startDate) {
+    throw new Refusal(409, "An admin has to set the start date before bills are entered.");
+  }
+  // Cylinders that moved earlier are already in the opening counts.
+  if (date < startDate) {
+    throw new Refusal(409, "A bill cannot be dated before the start date.");
+  }
 }
 
 /**
@@ -72,6 +157,20 @@ async function lockParty(tx: Transaction, partyId: string) {
     throw noSuchParty();
   }
   return party;
+}
+
+/** Refuses a vehicle that does not exist or is not offered on anything new. */
+async function refuseUnusableVehicle(tx: Transaction, vehicleId: string): Promise<void> {
+  const vehicle = await tx.vehicle.findUnique({
+    where: { id: vehicleId },
+    select: { plate: true, active: true },
+  });
+  if (!vehicle) {
+    throw noSuchVehicle();
+  }
+  if (!vehicle.active) {
+    throw inactiveRefusal(vehicle.plate);
+  }
 }
 
 /** Refuses lines naming a gas that does not exist or is not offered on anything new. */
@@ -102,4 +201,13 @@ async function issueNumber(tx: Transaction, prefix: string, date: string): Promi
     RETURNING last
   `;
   return `${prefix}-${date.replaceAll("-", "")}-${String(counter.last).padStart(3, "0")}`;
+}
+
+/** The lines as they are saved, each with its place on the bill. */
+function numbered(lines: NewBillLine[]) {
+  return lines.map((line, index) => ({ ...line, lineNo: index + 1 }));
+}
+
+function inactiveRefusal(name: string): Refusal {
+  return new Refusal(409, `${name} is inactive. Make it active first.`);
 }

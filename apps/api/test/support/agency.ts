@@ -1,10 +1,14 @@
 import {
+  billListSchema,
   billSchema,
   gasListSchema,
   partySchema,
   shopSchema,
+  stockReportSchema,
+  vehicleSchema,
   type FillState,
   type PartyType,
+  type StockReportRow,
 } from "@gasflow/shared";
 import { expect } from "vitest";
 import { startTestApp } from "./test-app";
@@ -64,6 +68,17 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     return partySchema.parse(response.json());
   }
 
+  async function addVehicle(vehicle: { plate: string; label?: string; active?: boolean }) {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/vehicles",
+      headers: staff.headers,
+      payload: vehicle,
+    });
+    expect(response.statusCode).toBe(201);
+    return vehicleSchema.parse(response.json());
+  }
+
   /** The lines as a request carries them. */
   const asLines = (lines: Line[]) =>
     lines.map(({ gas: name, fillState = "filled", quantity }) => ({
@@ -83,5 +98,78 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     return billSchema.parse(response.json());
   }
 
-  return { ...testApp, admin, staff, shop, get, gas, addParty, asLines, postOpeningStock, enter };
+  /** Asks to save a bill, as the staff member unless told otherwise. */
+  const postBill = (payload: object, { headers }: { headers: Record<string, string> } = staff) =>
+    app.inject({ method: "POST", url: "/api/bills", headers, payload });
+
+  let billsNumbered = 0;
+
+  /**
+   * What the new bill form sends for a dispatch, with a fresh bill number. A test
+   * changes whatever matters to it.
+   */
+  function dispatchFor(customerId: string, change: object = {}) {
+    billsNumbered += 1;
+    return {
+      type: "dispatch",
+      paperKind: "bill",
+      number: String(1000 + billsNumbered),
+      date: "2026-11-26",
+      customerId,
+      lines: asLines([{ gas: "Medical oxygen", quantity: 5 }]),
+      ...change,
+    };
+  }
+
+  /** Saves a dispatch bill, expecting it to be saved. */
+  async function dispatch(customerId: string, change?: object) {
+    const response = await postBill(dispatchFor(customerId, change));
+    expect(response.statusCode).toBe(201);
+    return billSchema.parse(response.json());
+  }
+
+  /** The stock report staff see for a query such as "date=2026-11-01". */
+  async function report(query = "") {
+    const response = await get(`/api/reports/stock?${query}`);
+    expect(response.statusCode).toBe(200);
+    return stockReportSchema.parse(response.json());
+  }
+
+  /** The report's figures for one gas, or undefined if the report leaves it out. */
+  async function figures(gas: string, query?: string) {
+    const row = (await report(query)).rows.find((candidate) => candidate.gas.name === gas);
+    if (!row) {
+      return undefined;
+    }
+    const counts: Partial<StockReportRow> = { ...row };
+    delete counts.gas;
+    return counts;
+  }
+
+  /** One page of the bill list for a query such as "page=2". */
+  async function bills(query = "") {
+    const response = await get(`/api/bills?${query}`);
+    expect(response.statusCode).toBe(200);
+    return billListSchema.parse(response.json());
+  }
+
+  return {
+    ...testApp,
+    admin,
+    staff,
+    shop,
+    get,
+    gas,
+    addParty,
+    addVehicle,
+    asLines,
+    postOpeningStock,
+    enter,
+    postBill,
+    dispatchFor,
+    dispatch,
+    report,
+    figures,
+    bills,
+  };
 }

@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, type Prisma } from "./generated/prisma/client";
+import { Prisma, PrismaClient } from "./generated/prisma/client";
 
 export type Database = PrismaClient;
 
@@ -8,4 +8,9 @@ export type Transaction = Prisma.TransactionClient;
 
 export function createDatabase(url: string): Database {
   return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+}
+
+/** Whether a save was refused because it would repeat something that must be unique. */
+export function isRepeat(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }

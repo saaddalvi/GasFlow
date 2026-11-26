@@ -1,4 +1,10 @@
-import { HOLDER_TYPES, type Bill, type OpeningStockListQuery } from "@gasflow/shared";
+import {
+  HOLDER_TYPES,
+  type Bill,
+  type BillListQuery,
+  type BillNumberUseQuery,
+  type OpeningStockListQuery,
+} from "@gasflow/shared";
 import type { Database } from "../database";
 import { fromDatabaseDate } from "../database-date";
 import { Refusal } from "../refusal";
@@ -15,22 +21,9 @@ export async function getBill(db: Database, billId: string): Promise<Bill> {
   const bill = await db.bill.findUnique({
     where: { id: billId },
     select: {
-      id: true,
-      type: true,
-      number: true,
-      date: true,
-      status: true,
-      fromParty: { select: PARTY },
-      toParty: { select: PARTY },
-      lines: {
-        select: {
-          id: true,
-          gas: { select: { id: true, name: true } },
-          fillState: true,
-          quantity: true,
-        },
-        orderBy: { lineNo: "asc" },
-      },
+      ...SUMMARY,
+      vehicle: { select: { id: true, plate: true, label: true } },
+      notes: true,
       enteredBy: { select: STAFF },
       enteredAt: true,
     },
@@ -38,14 +31,34 @@ export async function getBill(db: Database, billId: string): Promise<Bill> {
   if (!bill) {
     throw noSuchBill();
   }
-  const { fromParty, toParty, date, enteredAt, ...rest } = bill;
-  return {
-    ...rest,
-    date: fromDatabaseDate(date),
-    from: fromParty,
-    to: toParty,
-    enteredAt: enteredAt.toISOString(),
-  };
+  const { enteredAt, ...rest } = bill;
+  return { ...asReported(rest), enteredAt: enteredAt.toISOString() };
+}
+
+/** One page of all the bills, the newest first. */
+export async function listBills(db: Database, { page }: BillListQuery) {
+  // Not in a transaction, whose one connection cannot run the queries for a
+  // bill's parties and lines side by side.
+  const [bills, total] = await Promise.all([
+    db.bill.findMany({
+      select: SUMMARY,
+      // The id keeps bills entered at one moment in the same order on every page.
+      orderBy: [{ date: "desc" }, { enteredAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    db.bill.count(),
+  ]);
+  return { bills: bills.map(asReported), total, page, pageSize: PAGE_SIZE };
+}
+
+/** The posted bill that has this number on this paper kind, if there is one. */
+export async function findNumberUse(db: Database, { paperKind, number }: BillNumberUseQuery) {
+  const bill = await db.bill.findFirst({
+    where: { paperKind, number, status: "posted" },
+    select: { id: true, date: true },
+  });
+  return { usedBy: bill && { id: bill.id, date: fromDatabaseDate(bill.date) } };
 }
 
 /** One page of the parties' posted opening stock, by party name. */
@@ -106,8 +119,44 @@ export function noSuchBill(): Refusal {
   return new Refusal(404, "There is no such bill.");
 }
 
+/** A bill's own columns as the API names them: a plain date, and who is on each side. */
+function asReported<Row extends { date: Date; fromParty: unknown; toParty: unknown }>({
+  date,
+  fromParty,
+  toParty,
+  ...rest
+}: Row) {
+  return {
+    ...rest,
+    date: fromDatabaseDate(date),
+    from: fromParty as Row["fromParty"],
+    to: toParty as Row["toParty"],
+  };
+}
+
 /** The columns the API reports for a party named on a bill. */
 const PARTY = { id: true, name: true, type: true } as const;
 
 /** The columns the API reports for whoever entered a bill. */
 const STAFF = { id: true, displayName: true } as const;
+
+/** What a list of bills shows of each one. */
+const SUMMARY = {
+  id: true,
+  type: true,
+  paperKind: true,
+  number: true,
+  date: true,
+  status: true,
+  fromParty: { select: PARTY },
+  toParty: { select: PARTY },
+  lines: {
+    select: {
+      id: true,
+      gas: { select: { id: true, name: true } },
+      fillState: true,
+      quantity: true,
+    },
+    orderBy: { lineNo: "asc" },
+  },
+} as const;
