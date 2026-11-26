@@ -3,6 +3,8 @@ import type {
   BillReturns,
   ClosedRowList,
   ClosedRowListQuery,
+  Split,
+  SplitQuery,
   PendingList,
   PendingQuery,
   PendingRow,
@@ -13,6 +15,7 @@ import { today, type Clock } from "../clock";
 import type { Database, Transaction } from "../database";
 import { fromDatabaseDate } from "../database-date";
 import { Prisma } from "../generated/prisma/client";
+import { noSuchGas } from "./gases";
 import { listParties, noSuchParty } from "./parties";
 
 // What customers have yet to return. It is worked out from the posted bills and
@@ -96,6 +99,31 @@ export async function listPending(
       return { ...reported, daysOut: daysBetween(reported.bill.date, now) };
     }),
   };
+}
+
+/**
+ * How a total of one gas would fill what the customer has pending on the date,
+ * the oldest bill first, and how much would be left over. It saves nothing.
+ */
+export async function proposeSplit(
+  db: Database,
+  clock: Clock,
+  { customerId, date, gasId, total }: SplitQuery,
+): Promise<Split> {
+  const { rows } = await listPending(db, clock, { customerId, date });
+  // A retired gas is still filled, as its cylinders can still come back.
+  if (!(await db.gas.findUnique({ where: { id: gasId }, select: { id: true } }))) {
+    throw noSuchGas();
+  }
+  let left = total;
+  const filled: Split["rows"] = [];
+  for (const { bill, gas, pending } of rows) {
+    if (gas.id !== gasId || left === 0) continue;
+    const quantity = Math.min(pending, left);
+    filled.push({ billId: bill.id, quantity });
+    left -= quantity;
+  }
+  return { rows: filled, excess: left };
 }
 
 /** One page of the customer's rows, dated on or before the date, with nothing pending. */

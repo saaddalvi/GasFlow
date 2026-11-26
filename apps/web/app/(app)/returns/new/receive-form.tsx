@@ -3,9 +3,11 @@
 import {
   checkInput,
   FILL_STATES,
+  splitSchema,
   newReturnSchema,
   pendingBillName,
   pendingListSchema,
+  type Split,
   type FillState,
   type PendingList,
   type ReceivedReturn,
@@ -27,6 +29,7 @@ import { useLookup, type Lookup } from "@/lib/use-lookup";
 import { saveReturn } from "./actions";
 import { ClosedRows } from "./closed-rows";
 import { CustomerPicker } from "./customer-picker";
+import { FillOldestFirst, type AskedSplit } from "./split-oldest-first";
 import { LoadState } from "./load-state";
 import { RowCounts, RowHeading } from "./row-heading";
 
@@ -46,7 +49,25 @@ interface Entry {
 
 const BLANK: Entry = { quantity: "", fillState: "empty" };
 
-const keyOf = ({ bill, gas }: Row) => `${bill.id} ${gas.id}`;
+/** The key of a row's entry, from its bill and gas. */
+const keyFor = (billId: string, gasId: string) => `${billId} ${gasId}`;
+
+const keyOf = ({ bill, gas }: Row) => keyFor(bill.id, gas.id);
+
+/**
+ * The entries with the split put in the rows of its gas. Rows of that gas it
+ * leaves out are emptied, and each row keeps its fill state.
+ */
+function withSplit(entries: Record<string, Entry>, gasId: string, { rows }: Split) {
+  const next = Object.fromEntries(
+    Object.entries(entries).filter(([key]) => !key.endsWith(keyFor("", gasId))),
+  );
+  for (const { billId, quantity } of rows) {
+    const key = keyFor(billId, gasId);
+    next[key] = { ...(entries[key] ?? BLANK), quantity: String(quantity) };
+  }
+  return next;
+}
 
 /** What was typed as a count, which is none until it is one that could be saved. */
 function cylinders(typed: string): number {
@@ -76,6 +97,10 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
   const [saves, setSaves] = useState(0);
   const [retries, setRetries] = useState(0);
   const [received, setReceived] = useState<ReceivedReturn>();
+  const [askedSplit, setAskedSplit] = useState<AskedSplit | null>(null);
+  // How many times Fill oldest first has been pressed. It never goes back, so that
+  // pressing it again always asks again, even for what was asked before a save.
+  const [splitsAsked, setSplitsAsked] = useState(0);
   const dated = date >= startDate;
   const answer = useLookup(
     customer && dated
@@ -85,6 +110,26 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
     saves + retries,
   );
   const rows = answer?.data?.rows;
+  // Asked again whenever the date changes, so that the split follows it.
+  const splitAnswer = useLookup(
+    customer && dated && askedSplit
+      ? `${RECEIVE_EMPTIES_PATH}/split?${new URLSearchParams({
+          customerId: customer.id,
+          date,
+          gasId: askedSplit.gas.id,
+          total: String(askedSplit.total),
+        }).toString()}`
+      : null,
+    splitSchema,
+    splitsAsked,
+  );
+  // Each split is put in the rows once, after which staff may change them.
+  const [applied, setApplied] = useState<Split>();
+  const proposal = splitAnswer?.data;
+  if (askedSplit && proposal && proposal !== applied) {
+    setApplied(proposal);
+    setEntries(withSplit(entries, askedSplit.gas.id, proposal));
+  }
   // Only what is typed on a row that is listed is saved, so what is typed on one
   // that has since left the list is pointed out.
   const listed = new Set(rows?.map(keyOf));
@@ -105,6 +150,7 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
     setCustomer(chosen);
     setEntries({});
     setSlipNumber("");
+    setAskedSplit(null);
     if (chosen) setReceived(undefined);
   }
 
@@ -136,6 +182,7 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
       setReceived(received);
       setEntries({});
       setSlipNumber("");
+      setAskedSplit(null);
       // The next return is today's unless said otherwise.
       setDate(today);
     }
@@ -177,6 +224,19 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
                 </Note>
               ) : (
                 <>
+                  {(Boolean(rows?.length) || askedSplit) && (
+                    <FillOldestFirst
+                      key={customer.id}
+                      rows={rows ?? []}
+                      customerName={customer.name}
+                      asked={askedSplit}
+                      answer={splitAnswer}
+                      onFill={(gas, total) => {
+                        setAskedSplit({ gas, total });
+                        setSplitsAsked((count) => count + 1);
+                      }}
+                    />
+                  )}
                   <Pending
                     answer={answer}
                     customer={customer}
@@ -294,7 +354,7 @@ function PendingRowFields({
           </button>
           <div className="col-span-2 min-w-0 min-[26rem]:col-span-1">
             <SelectField
-              label="Fill state"
+              label="Split state"
               value={entry.fillState}
               onChange={(event) =>
                 onChange({ ...entry, fillState: event.target.value as FillState })

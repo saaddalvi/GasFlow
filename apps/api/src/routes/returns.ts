@@ -1,6 +1,8 @@
 import {
   closedRowListQuerySchema,
   closedRowListSchema,
+  splitQuerySchema,
+  splitSchema,
   newReturnSchema,
   pendingListSchema,
   pendingQuerySchema,
@@ -12,7 +14,12 @@ import type { FastifyInstance } from "fastify";
 import type { AppDependencies } from "../app";
 import { parseRequest } from "../refusal";
 import { receiveReturn } from "../services/ledger";
-import { listClosedRows, listPending, listReturnCustomers } from "../services/pending";
+import {
+  listClosedRows,
+  listPending,
+  listReturnCustomers,
+  proposeSplit,
+} from "../services/pending";
 
 /** Every staff member receives empties. */
 export function returnRoutes(app: FastifyInstance, { db, clock }: AppDependencies): void {
@@ -29,6 +36,12 @@ export function returnRoutes(app: FastifyInstance, { db, clock }: AppDependencie
   app.get("/api/returns/pending", async (request) => {
     const query = parseRequest(pendingQuerySchema, request.query);
     return pendingListSchema.parse(await listPending(db, clock, query));
+  });
+
+  // Saves nothing: staff see the split and may change it before saving.
+  app.get("/api/returns/split", async (request) => {
+    const query = parseRequest(splitQuerySchema, request.query);
+    return splitSchema.parse(await proposeSplit(db, clock, query));
   });
 
   app.post("/api/returns", async (request, reply) => {

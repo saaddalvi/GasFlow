@@ -2,6 +2,7 @@ import {
   billListSchema,
   billSchema,
   closedRowListSchema,
+  splitSchema,
   gasListSchema,
   partySchema,
   pendingListSchema,
@@ -209,6 +210,29 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     return pendingListSchema.parse(response.json()).rows;
   }
 
+  /** Asks how "Fill oldest first" would split a total of a gas, as the staff member unless told otherwise. */
+  const askSplit = (
+    customerId: string,
+    gasId: string,
+    total: number | string,
+    {
+      date = "2026-11-26",
+      as = staff,
+    }: { date?: string; as?: { headers: Record<string, string> } } = {},
+  ) =>
+    app.inject({
+      method: "GET",
+      url: `/api/returns/split?${new URLSearchParams({ customerId, date, gasId, total: String(total) }).toString()}`,
+      headers: as.headers,
+    });
+
+  /** How "Fill oldest first" would split a total of the named gas, on a date. */
+  async function split(customerId: string, name: string, total: number, date?: string) {
+    const response = await askSplit(customerId, gas(name).id, total, { date });
+    expect(response.statusCode).toBe(200);
+    return splitSchema.parse(response.json());
+  }
+
   /** One page of the rows with nothing pending, for a query such as "page=2". */
   async function closed(customerId: string, query = "", date = "2026-11-26") {
     const response = await get(
@@ -281,6 +305,8 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     postReturn,
     receive,
     pending,
+    askSplit,
+    split,
     closed,
     returnCustomers,
     viewBill,

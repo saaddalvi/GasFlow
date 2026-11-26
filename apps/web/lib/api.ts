@@ -4,6 +4,7 @@ import {
   billNumberUseSchema,
   billSchema,
   closedRowListSchema,
+  splitSchema,
   gasListSchema,
   openingStockListSchema,
   openingStockPartiesSchema,
@@ -26,6 +27,8 @@ import {
   type BillNumberUseQuery,
   type ClosedRowList,
   type ClosedRowListQuery,
+  type Split,
+  type SplitQuery,
   type GasList,
   type OpeningStockList,
   type OpeningStockListQuery,
@@ -107,6 +110,12 @@ export async function fetchPending(query: PendingQuery): Promise<PendingList> {
   return pendingListSchema.parse(
     await getJson(`/api/returns/pending?${new URLSearchParams(query).toString()}`),
   );
+}
+
+/** How "Fill oldest first" would split a total of a gas. It saves nothing. */
+export async function fetchSplit({ total, ...query }: SplitQuery): Promise<Split> {
+  const search = new URLSearchParams({ ...query, total: String(total) });
+  return splitSchema.parse(await getJson(`/api/returns/split?${search.toString()}`));
 }
 
 /** One page of the customer's rows with nothing pending. */

@@ -17,7 +17,7 @@ export const newAllocationSchema = z.object(
     quantity: quantitySchema,
     fillState: fillStateSchema.default("empty"),
   },
-  "Fill in each row.",
+  "Split in each row.",
 );
 
 export type NewAllocation = z.infer<typeof newAllocationSchema>;
@@ -125,3 +125,27 @@ export const returnCustomerListSchema = z.object({
 });
 
 export type ReturnCustomerList = z.infer<typeof returnCustomerListSchema>;
+
+const WHOLE_TOTAL = "Enter the total as a whole number of cylinders.";
+
+/** Asks how "Fill oldest first" would split a total of one gas. */
+export const splitQuerySchema = pendingQuerySchema.extend({
+  gasId: z.uuid("Choose a gas to fill.").toLowerCase(),
+  total: z.coerce
+    .number(WHOLE_TOTAL)
+    .int(WHOLE_TOTAL)
+    .min(1, "Enter a total of 1 or more.")
+    .max(1_000_000, "Enter a total of at most 1000000."),
+});
+
+export type SplitQuery = z.infer<typeof splitQuerySchema>;
+
+/** The split "Fill oldest first" proposes. Nothing is saved until staff save the return. */
+export const splitSchema = z.object({
+  /** How many to return against each bill of the gas, the oldest first. */
+  rows: z.array(z.object({ billId: z.uuid(), quantity: z.int().positive() })),
+  /** What is left over once everything eligible is filled. */
+  excess: z.int().nonnegative(),
+});
+
+export type Split = z.infer<typeof splitSchema>;
