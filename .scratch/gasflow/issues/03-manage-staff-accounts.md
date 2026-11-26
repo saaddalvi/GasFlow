@@ -4,7 +4,7 @@
 
 **Blocked by:** 02: Sign in with a username.
 
-**Status:** needs-info
+**Status:** ready-for-agent
 
 - [x] An admin can create an account with a name, username and starting password, and that person can then sign in
 - [x] Clerk's refusals (username taken or too short, password under 8 characters) are shown as clear messages
@@ -43,3 +43,9 @@ For the project owner to decide:
 - Still open from ticket 02: Clerk lets signed-in people delete their own account (`delete_self`), which could remove the last admin.
 
 **26 November 2026: leaked-password check removed** at the project owner's request. It is off in the Clerk development instance, and the spec's Clerk setup section now says so for production too.
+
+**26 November 2026: completed** in commits `5c2b306` and `8ca313e`, both pushed. CI had passed at `d41b4f2`; its run on `8ca313e` had not finished when this was written.
+
+- The project owner ticked every criterion and asked for the ticket to be marked completed. No results of the real-account checks under "Still to do" were recorded here.
+- The decisions listed for the project owner are not recorded as settled.
+
