@@ -1,20 +1,33 @@
 import { auth } from "@clerk/nextjs/server";
 import {
+  billSchema,
   gasListSchema,
+  openingStockListSchema,
+  openingStockPartiesSchema,
   partyListSchema,
   partySchema,
   refusalSchema,
   shopSchema,
   staffListSchema,
   staffSchema,
+  startDateSchema,
+  stockReportSchema,
+  todaySchema,
   vehicleListSchema,
+  type Bill,
   type GasList,
+  type OpeningStockList,
+  type OpeningStockListQuery,
+  type OpeningStockParties,
   type Party,
   type PartyList,
   type PartyListQuery,
   type Shop,
   type Staff,
   type StaffList,
+  type StartDate,
+  type StockReport,
+  type StockReportQuery,
   type VehicleList,
 } from "@gasflow/shared";
 import { refresh } from "next/cache";
@@ -34,12 +47,40 @@ export async function fetchParties(query: PartyListQuery): Promise<PartyList> {
 
 /** The party, or undefined if there is none with this id. */
 export async function fetchParty(partyId: string): Promise<Party | undefined> {
-  const path = `/api/parties/${encodeURIComponent(partyId)}`;
-  const response = await askApi(path);
-  if (response.status === 404) {
-    return undefined;
-  }
-  return partySchema.parse(await readJson(response, path));
+  const found = await findJson(`/api/parties/${encodeURIComponent(partyId)}`);
+  return found === undefined ? undefined : partySchema.parse(found);
+}
+
+/** The bill, or undefined if there is none with this id. */
+export async function fetchBill(billId: string): Promise<Bill | undefined> {
+  const found = await findJson(`/api/bills/${encodeURIComponent(billId)}`);
+  return found === undefined ? undefined : billSchema.parse(found);
+}
+
+export async function fetchStartDate(): Promise<StartDate> {
+  return startDateSchema.parse(await getJson("/api/start-date"));
+}
+
+export async function fetchOpeningStock({
+  page,
+}: OpeningStockListQuery): Promise<OpeningStockList> {
+  return openingStockListSchema.parse(await getJson(`/api/opening-stock?page=${page}`));
+}
+
+/** The parties whose opening stock can still be entered. Only for admins. */
+export async function fetchOpeningStockParties(): Promise<OpeningStockParties> {
+  return openingStockPartiesSchema.parse(await getJson("/api/opening-stock/parties"));
+}
+
+/** The stock report for the date, or for today if none is given. */
+export async function fetchStockReport({ date }: StockReportQuery): Promise<StockReport> {
+  const query = new URLSearchParams(date ? { date } : {});
+  return stockReportSchema.parse(await getJson(`/api/reports/stock?${query}`));
+}
+
+/** Today's date in India. */
+export async function fetchToday(): Promise<string> {
+  return todaySchema.parse(await getJson("/api/today")).date;
 }
 
 /** Every vehicle, inactive ones too. */
@@ -117,6 +158,12 @@ export function orNull<T>(answer: Promise<T>): Promise<T | null> {
 
 async function getJson(path: string): Promise<unknown> {
   return readJson(await askApi(path), path);
+}
+
+/** What is at the path, or undefined if there is nothing there. */
+async function findJson(path: string): Promise<unknown> {
+  const response = await askApi(path);
+  return response.status === 404 ? undefined : readJson(response, path);
 }
 
 async function readJson(response: Response, path: string): Promise<unknown> {

@@ -7,3 +7,7 @@ export * from "./refusal";
 export * from "./party";
 export * from "./query";
 export * from "./vehicle";
+export * from "./setup";
+export * from "./bill";
+export * from "./opening-stock";
+export * from "./stock-report";

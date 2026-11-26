@@ -32,6 +32,9 @@ Then open <http://localhost:3000> and sign in. If nobody has an account yet,
 [create the first admin](#create-the-first-admin). The page after sign-in lists
 the gases, which the web app reads from the API on <http://localhost:4000>.
 
+Before opening stock can be entered, an admin sets the start date once, on the
+**Opening stock** page. The app offers no way to change it.
+
 If a port is already taken, change it in `.env`:
 
 | Port in use    | Settings to change                                   |
@@ -132,10 +135,16 @@ In the API:
   date in Indian Standard Time, from `today()` in the same file.
 - Accounts and sign-in go only through the `IdentityProvider` in
   `src/identity.ts`; the real one is `src/clerk-identity.ts`.
+- Only the bill ledger, `src/services/ledger.ts`, changes bills. Each of its
+  operations checks the rules and writes in one transaction.
+- Reports only read. They work every figure out from posted bills, and no stock
+  count is stored.
+- A calendar date is text such as `2026-11-26`; `src/database-date.ts` converts
+  it for the database.
 - To turn a request down, throw a `Refusal` from `src/refusal.ts` with the status
   and a message fit to show the person. Check request bodies and query strings
-  with `parseRequest`. The party, vehicle and gas forms check what was typed
-  against the same schemas first, with `checkInput` from `packages/shared`.
+  with `parseRequest`. The forms check what was typed against the same schemas
+  first, with `checkInput` from `packages/shared`.
 - Parties, vehicles and gases are never deleted: they are made inactive (a gas is
   "retired"), and their lists leave them out unless asked. Anything that offers
   them on a new entry must ask for the default list.

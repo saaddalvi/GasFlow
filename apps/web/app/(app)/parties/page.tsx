@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/empty-state";
 import { CheckboxField, Field, SelectField } from "@/components/fields";
 import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
+import { EmptyPage, Pagination } from "@/components/pagination";
 import { Tag } from "@/components/tag";
 import { fetchParties, orNull } from "@/lib/api";
 import { partyListSearch } from "@/lib/party-list-search";
@@ -115,18 +116,8 @@ function Results({
     return <EmptyState>{emptyText}</EmptyState>;
   }
   if (parties.length === 0) {
-    return (
-      <EmptyState>
-        There is nothing on this page.{" "}
-        <Link href={pageHref(1)} className="text-brand-700 underline">
-          Go to the first page
-        </Link>
-      </EmptyState>
-    );
+    return <EmptyPage firstPageHref={pageHref(1)} />;
   }
-  const first = (page - 1) * pageSize + 1;
-  const last = first + parties.length - 1;
-
   return (
     <div className="space-y-3">
       {/* Relative, so that the hidden words in the table scroll with it. */}
@@ -158,23 +149,13 @@ function Results({
           </tbody>
         </table>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
-        <p className="tabular-nums">
-          {first} to {last} of {total}
-        </p>
-        <nav aria-label="Pages" className="flex gap-2">
-          {page > 1 && (
-            <Link href={pageHref(page - 1)} className={buttonStyles.secondary}>
-              Previous
-            </Link>
-          )}
-          {last < total && (
-            <Link href={pageHref(page + 1)} className={buttonStyles.secondary}>
-              Next
-            </Link>
-          )}
-        </nav>
-      </div>
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        shown={parties.length}
+        total={total}
+        pageHref={pageHref}
+      />
     </div>
   );
 }

@@ -4,13 +4,15 @@ import { SignOutButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { SIGN_IN_PATH } from "@/lib/routes";
+import { OPENING_STOCK_PATH, SIGN_IN_PATH } from "@/lib/routes";
 import { LogoMark } from "./logo-mark";
 
 const LINKS = [
   { href: "/", label: "Gases" },
   { href: "/parties", label: "Parties" },
   { href: "/vehicles", label: "Vehicles" },
+  { href: OPENING_STOCK_PATH, label: "Opening stock" },
+  { href: "/reports/stock", label: "Stock" },
   { href: "/staff", label: "Staff", adminOnly: true },
 ];
 
@@ -30,11 +32,11 @@ export function NavBar({
           <LogoMark />
           <span className="truncate font-semibold">{shopName}</span>
         </Link>
-        <nav aria-label="Main" className="hidden gap-1 md:flex">
+        <nav aria-label="Main" className="hidden gap-1 lg:flex">
           <NavLinks isAdmin={isAdmin} />
         </nav>
         <AccountMenu staffName={staffName} />
-        <PhoneMenu staffName={staffName} isAdmin={isAdmin} />
+        <CollapsedMenu staffName={staffName} isAdmin={isAdmin} />
       </div>
     </header>
   );
@@ -65,7 +67,7 @@ function AccountMenu({ staffName }: { staffName?: string }) {
   const { ref } = useMenu();
 
   return (
-    <details ref={ref} className="relative ml-auto hidden md:block">
+    <details ref={ref} className="relative ml-auto hidden lg:block">
       <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
         <span className="max-w-48 truncate">{staffName ?? "Account"}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 fill-none stroke-current">
@@ -79,12 +81,12 @@ function AccountMenu({ staffName }: { staffName?: string }) {
   );
 }
 
-/** The whole navigation, including sign out, behind one button on a phone. */
-function PhoneMenu({ staffName, isAdmin }: { staffName?: string; isAdmin: boolean }) {
+/** The whole navigation, including sign out, behind one button on a narrower screen. */
+function CollapsedMenu({ staffName, isAdmin }: { staffName?: string; isAdmin: boolean }) {
   const { ref, close } = useMenu();
 
   return (
-    <details ref={ref} className="ml-auto md:hidden">
+    <details ref={ref} className="ml-auto lg:hidden">
       <summary
         aria-label="Menu"
         className="flex size-11 cursor-pointer list-none items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 [&::-webkit-details-marker]:hidden"

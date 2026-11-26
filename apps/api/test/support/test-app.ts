@@ -49,5 +49,15 @@ export async function startTestApp(addRoutes?: (app: FastifyInstance) => void) {
     return staffSchema.parse(response.json());
   }
 
-  return { app, db, clock, identity, signIn, me };
+  /**
+   * Opens the database connections that requests sent together will use. Without
+   * this the first can finish while the others are still connecting, and a test
+   * would not see what happens when they overlap. Call it just before them.
+   */
+  async function openConnections() {
+    const hold = () => db.$executeRaw`SELECT pg_sleep(0.05)`;
+    await Promise.all(Array.from({ length: 5 }, hold));
+  }
+
+  return { app, db, clock, identity, signIn, me, openConnections };
 }

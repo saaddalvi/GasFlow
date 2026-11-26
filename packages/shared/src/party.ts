@@ -9,6 +9,11 @@ export const partyTypeSchema = z.enum(PARTY_TYPES, "Choose customer, refiller or
 
 export type PartyType = z.infer<typeof partyTypeSchema>;
 
+/** The parties whose cylinders are counted. A supplier holds none. */
+export const HOLDER_TYPES = ["shop", "customer", "refiller"] as const;
+
+export type HolderType = (typeof HOLDER_TYPES)[number];
+
 export const partySchema = z.object({
   id: z.uuid(),
   type: partyTypeSchema,

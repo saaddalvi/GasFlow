@@ -3,9 +3,13 @@ import { requireSignIn } from "./auth";
 import type { Clock } from "./clock";
 import type { Database } from "./database";
 import type { IdentityProvider } from "./identity";
+import { billRoutes } from "./routes/bills";
 import { gasRoutes } from "./routes/gases";
 import { meRoutes } from "./routes/me";
+import { openingStockRoutes } from "./routes/opening-stock";
 import { partyRoutes } from "./routes/parties";
+import { reportRoutes } from "./routes/reports";
+import { setupRoutes } from "./routes/setup";
 import { shopRoutes } from "./routes/shop";
 import { staffRoutes } from "./routes/staff";
 import { todayRoutes } from "./routes/today";
@@ -21,9 +25,13 @@ export interface AppDependencies {
 export function buildApp(dependencies: AppDependencies, options: FastifyServerOptions = {}) {
   const app = Fastify(options);
   requireSignIn(app, dependencies);
+  billRoutes(app, dependencies);
   gasRoutes(app, dependencies);
   meRoutes(app);
+  openingStockRoutes(app, dependencies);
   partyRoutes(app, dependencies);
+  reportRoutes(app, dependencies);
+  setupRoutes(app, dependencies);
   shopRoutes(app, dependencies);
   staffRoutes(app, dependencies);
   todayRoutes(app, dependencies);

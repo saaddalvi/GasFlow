@@ -29,6 +29,8 @@ model Party {
   address       String?
   notes         String?
   active        Boolean   @default(true)
+  billsFrom     Bill[]    @relation("bills_from")
+  billsTo       Bill[]    @relation("bills_to")
 
   // The agency has exactly one shop.
   @@unique([type], map: "parties_one_shop", where: raw("type = 'shop'"))
@@ -36,23 +38,35 @@ model Party {
 }
 
 model Gas {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   /// Case-insensitive, so that no two gases differ only in capitals.
-  name      String  @unique @db.Citext
-  sortOrder Int     @map("sort_order")
+  name      String     @unique @db.Citext
+  sortOrder Int        @map("sort_order")
   /// False once an admin retires the gas. A gas is never deleted.
-  active    Boolean @default(true)
+  active    Boolean    @default(true)
+  billLines BillLine[]
 
   @@map("gases")
+}
+
+/// What was decided once, when the agency set the app up. It has one row at
+/// most, which a check in the migration keeps to the id 1.
+model Setup {
+  id        Int      @id @default(1)
+  /// The date from which the records begin. No bill is dated earlier.
+  startDate DateTime @map("start_date") @db.Date
+
+  @@map("setup")
 }
 
 /// A staff member who has signed in. The row outlives their account, so that
 /// bills can go on showing who entered them. The admin role is not stored here;
 /// the identity provider holds it.
 model Staff {
-  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  identityId  String @unique @map("identity_id")
-  displayName String @map("display_name")
+  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  identityId   String @unique @map("identity_id")
+  displayName  String @map("display_name")
+  billsEntered Bill[]
 
   @@map("staff")
 }
@@ -65,4 +79,78 @@ model Vehicle {
   active Boolean @default(true)
 
   @@map("vehicles")
+}
+
+enum BillType {
+  opening_stock
+
+  @@map("bill_type")
+}
+
+enum BillStatus {
+  posted
+  cancelled
+
+  @@map("bill_status")
+}
+
+enum FillState {
+  filled
+  empty
+  defective
+
+  @@map("fill_state")
+}
+
+/// A dated record of cylinders moving between parties, or joining or leaving the
+/// business. Only the bill ledger changes bills. Only posted ones count.
+model Bill {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        BillType
+  number      String
+  date        DateTime   @db.Date
+  status      BillStatus @default(posted)
+  /// Whom the cylinders leave. Null when they join the business.
+  fromPartyId String?    @map("from_party_id") @db.Uuid
+  /// Who receives them. Null when they leave the business.
+  toPartyId   String?    @map("to_party_id") @db.Uuid
+  enteredById String     @map("entered_by_id") @db.Uuid
+  enteredAt   DateTime   @map("entered_at") @db.Timestamptz(3)
+  fromParty   Party?     @relation("bills_from", fields: [fromPartyId], references: [id], onDelete: Restrict)
+  toParty     Party?     @relation("bills_to", fields: [toPartyId], references: [id], onDelete: Restrict)
+  enteredBy   Staff      @relation(fields: [enteredById], references: [id])
+  lines       BillLine[]
+
+  // A party has one opening stock. A cancelled one makes way for another.
+  @@unique([toPartyId], map: "bills_one_opening_stock_per_party", where: raw("type = 'opening_stock' AND status = 'posted'"))
+  @@index([date])
+  @@index([fromPartyId])
+  @@index([toPartyId])
+  @@map("bills")
+}
+
+model BillLine {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  billId    String    @map("bill_id") @db.Uuid
+  /// The line's place on its bill, counted from 1.
+  lineNo    Int       @map("line_no")
+  gasId     String    @map("gas_id") @db.Uuid
+  fillState FillState @map("fill_state")
+  /// More than zero, by a check in the migration.
+  quantity  Int
+  bill      Bill      @relation(fields: [billId], references: [id])
+  gas       Gas       @relation(fields: [gasId], references: [id])
+
+  @@unique([billId, lineNo])
+  @@map("bill_lines")
+}
+
+/// The last number issued to bills of one prefix and date.
+model BillNumberCounter {
+  prefix String
+  date   DateTime @db.Date
+  last   Int
+
+  @@id([prefix, date])
+  @@map("bill_number_counters")
 }
