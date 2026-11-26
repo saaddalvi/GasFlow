@@ -58,7 +58,14 @@ export function ActionForm({
 
   return (
     // "post" keeps passwords out of the address if this is sent before the page is ready.
-    <form method="post" onSubmit={submit} className="space-y-4">
+    <form
+      method="post"
+      onSubmit={submit}
+      // The browser stops a form with an invalid field before it is sent, and points
+      // at the field. What was said about an earlier try goes.
+      onInvalidCapture={() => setError(undefined)}
+      className="space-y-4"
+    >
       <Fragment key={changesMade}>{children}</Fragment>
       {error && (
         <p

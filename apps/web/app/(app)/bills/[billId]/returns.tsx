@@ -42,7 +42,8 @@ export function Returns({
                 <span className="text-slate-500">· {formatDate(entry.date)}</span>
                 <p className="text-slate-500">Entered by {entry.enteredBy.displayName}</p>
               </div>
-              <div className="text-right tabular-nums">
+              {/* At the right edge also when it drops below the number. */}
+              <div className="ml-auto text-right tabular-nums">
                 <p className="font-semibold">{entry.quantity} returned</p>
                 <p className="text-slate-500">{quantitiesByGas(entry.gases)}</p>
               </div>
@@ -54,17 +55,21 @@ export function Returns({
   );
 }
 
+// Closer on a phone, so that all four columns are in view on the narrowest.
+const NAME_CELL = "py-3 pl-3 pr-1.5 sm:px-5";
+const COUNT_CELL = "px-1.5 py-3 text-right last:pr-3 sm:px-3";
+
 function ByGas({ gases }: { gases: BillReturns["gases"] }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
+        <thead className="border-b border-slate-200 text-[0.6875rem] uppercase text-slate-400 sm:text-xs sm:tracking-wide">
           <tr>
-            <th scope="col" className="px-5 py-3 font-semibold">
+            <th scope="col" className={`${NAME_CELL} font-semibold`}>
               Gas
             </th>
             {["Sent", "Returned", "Pending"].map((heading) => (
-              <th key={heading} scope="col" className="px-3 py-3 text-right font-semibold">
+              <th key={heading} scope="col" className={`${COUNT_CELL} font-semibold`}>
                 {heading}
               </th>
             ))}
@@ -73,10 +78,10 @@ function ByGas({ gases }: { gases: BillReturns["gases"] }) {
         <tbody className="divide-y divide-slate-100 tabular-nums">
           {gases.map(({ gas, sent, returned, pending }) => (
             <tr key={gas.id}>
-              <td className="px-5 py-3">{gas.name}</td>
-              <td className="px-3 py-3 text-right">{sent}</td>
-              <td className="px-3 py-3 text-right">{returned}</td>
-              <td className="px-3 py-3 text-right font-semibold">{pending}</td>
+              <td className={NAME_CELL}>{gas.name}</td>
+              <td className={COUNT_CELL}>{sent}</td>
+              <td className={COUNT_CELL}>{returned}</td>
+              <td className={`${COUNT_CELL} font-semibold`}>{pending}</td>
             </tr>
           ))}
         </tbody>
