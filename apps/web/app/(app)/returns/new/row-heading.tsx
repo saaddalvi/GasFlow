@@ -22,17 +22,22 @@ export function RowHeading({ row: { bill, gas } }: { row: PendingRow }) {
   );
 }
 
-/** The cylinders a row sent, those since returned and those still pending. */
-export function RowCounts({ row: { sent, returned, pending } }: { row: PendingRow }) {
+/**
+ * The cylinders a row sent, those since returned, those written off if any, and
+ * those still pending.
+ */
+export function RowCounts({ row: { sent, returned, writtenOff, pending } }: { row: PendingRow }) {
+  const counts: [label: string, count: number][] = [
+    ["Sent", sent],
+    ["Returned", returned],
+    // Rarely any, so shown only when there are.
+    ...(writtenOff > 0 ? [["Written off", writtenOff] as [string, number]] : []),
+    ["Pending", pending],
+  ];
+
   return (
-    <dl className="flex gap-4 tabular-nums">
-      {(
-        [
-          ["Sent", sent],
-          ["Returned", returned],
-          ["Pending", pending],
-        ] as const
-      ).map(([label, count]) => (
+    <dl className="flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
+      {counts.map(([label, count]) => (
         <div key={label}>
           <dt className="text-xs text-slate-500">{label}</dt>
           <dd className={label === "Pending" ? "font-semibold" : undefined}>{count}</dd>

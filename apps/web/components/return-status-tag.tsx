@@ -7,7 +7,7 @@ const STATUSES = {
   closed: { name: "Closed", colour: "grey" },
 } as const;
 
-/** How much of a bill has come back. */
+/** How much of a bill has been returned or written off. */
 export function ReturnStatusTag({ status }: { status: ReturnStatus }) {
   const { name, colour } = STATUSES[status];
   return <Tag colour={colour}>{name}</Tag>;

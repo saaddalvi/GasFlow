@@ -69,6 +69,7 @@ test("pending cylinders are listed oldest first, one row for each bill and gas",
     gas: { id: gas(name).id, name },
     sent,
     returned: 0,
+    writtenOff: 0,
     pending: sent,
     daysOut,
   });
@@ -759,13 +760,15 @@ test("a dispatch bill shows what was sent, returned and pending, and each return
   expect((await viewBill(sent.id)).returns).toEqual({
     sent: 5,
     returned: 3,
+    writtenOff: 0,
     pending: 2,
     status: "partly_returned",
-    gases: [{ gas: oxygen, sent: 5, returned: 3, pending: 2 }],
+    gases: [{ gas: oxygen, sent: 5, returned: 3, writtenOff: 0, pending: 2 }],
     // By their dates, whenever they were entered.
     entries: [
       {
         id: receivedReturnSchema.parse(earlier.json()).id,
+        type: "return_from_customer",
         number: "RET-20261115-001",
         date: "2026-11-15",
         quantity: 2,
@@ -774,6 +777,7 @@ test("a dispatch bill shows what was sent, returned and pending, and each return
       },
       {
         id: later.id,
+        type: "return_from_customer",
         number: "RET-20261126-001",
         date: "2026-11-26",
         quantity: 1,

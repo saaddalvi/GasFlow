@@ -139,8 +139,8 @@ In the API:
   allocations. Each of its operations checks the rules and writes in one
   transaction. One that creates an allocation, or corrects or cancels a bill,
   locks the customer (or whichever party the bill names) before reading what is
-  matched, so that two saves cannot use the same pending cylinders, or return
-  against a bill as it changes. Correcting and cancelling lock the bill first,
+  matched, so that two saves cannot use the same pending cylinders, or return or
+  write off against a bill as it changes. Correcting and cancelling lock the bill first,
   because a correction can change whom it names; a change of party locks both,
   in the order of their ids. The database keeps bill numbers unique on each paper
   kind, and a refiller's slip numbers unique for that refiller, ignoring
@@ -155,9 +155,13 @@ In the API:
 - Cylinders added to the business come from a supplier or from nobody, and
   those written off go to nobody. Reports count only what the shop, customers
   and refillers gain and lose, so neither side outside the business ever shows.
+- A write-off from the shop or a refiller is a bill like the others. One from a
+  customer clears pending on a bill, so it is entered at
+  `/api/customer-write-offs`, is matched as a return is, and is never corrected.
 - Reports only read. They work every figure out from posted bills, and no stock
   count is stored. Pending cylinders are likewise worked out, by
-  `src/services/pending.ts`, from the allocations of posted returns. Unmatched
+  `src/services/pending.ts`, from the allocations of posted returns and
+  write-offs. Unmatched
   ones are whatever a return's lines hold beyond their allocations, worked out
   by `src/services/unmatched.ts`.
 - A calendar date is text such as `2026-11-26`; `src/database-date.ts` converts

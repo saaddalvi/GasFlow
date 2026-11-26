@@ -1,6 +1,7 @@
 import type {
   Bill,
   BillReturns,
+  ClearingType,
   ClosedRowList,
   ClosedRowListQuery,
   Split,
@@ -19,30 +20,36 @@ import { noSuchGas } from "./gases";
 import { listParties, noSuchParty } from "./parties";
 
 // What customers have yet to return. It is worked out from the posted bills and
-// the allocations of posted returns, and never stored. What came back beyond it
-// is in unmatched.ts.
+// the allocations of posted returns and write-offs, and never stored. What came
+// back beyond it is in unmatched.ts.
 
 const CLOSED_PAGE_SIZE = 50;
 
 /**
- * Each line that returns can be matched to: those of posted dispatch bills and
- * of customers' opening stock, with how much of each posted returns have used up,
- * whatever their dates.
+ * Each line that returns and write-offs can be matched to: those of posted
+ * dispatch bills and of customers' opening stock, with how much of each posted
+ * returns and write-offs have cleared, whatever their dates, and how much is
+ * still pending.
  */
 const CLEARABLE_LINES = Prisma.sql`
   SELECT l.id AS line_id, l.line_no, l.gas_id, l.quantity AS sent,
          b.id AS bill_id, b.to_party_id AS customer_id, b.type, b.paper_kind,
          b.number, b.date, b.entered_at,
-         COALESCE((
-           SELECT SUM(a.quantity)
-             FROM allocations a
-             JOIN bill_lines r ON r.id = a.clearing_line_id
-             JOIN bills rb ON rb.id = r.bill_id
-            WHERE a.cleared_line_id = l.id AND rb.status = 'posted'
-         ), 0)::int AS returned
+         cleared.returned, cleared.written_off,
+         l.quantity - cleared.returned - cleared.written_off AS pending
     FROM bills b
     JOIN parties p ON p.id = b.to_party_id AND p.type = 'customer'
     JOIN bill_lines l ON l.bill_id = b.id
+   CROSS JOIN LATERAL (
+     SELECT COALESCE(SUM(a.quantity) FILTER (WHERE cb.type = 'return_from_customer'), 0)::int
+              AS returned,
+            COALESCE(SUM(a.quantity) FILTER (WHERE cb.type = 'write_off'), 0)::int
+              AS written_off
+       FROM allocations a
+       JOIN bill_lines cl ON cl.id = a.clearing_line_id
+       JOIN bills cb ON cb.id = cl.bill_id
+      WHERE a.cleared_line_id = l.id AND cb.status = 'posted'
+   ) cleared
    WHERE b.status = 'posted' AND b.type IN ('dispatch', 'opening_stock')
 `;
 
@@ -73,7 +80,7 @@ export function findClearableLines(
     WITH lines AS (${CLEARABLE_LINES})
     SELECT c.line_id AS "lineId", c.bill_id AS "billId", c.paper_kind::text AS "paperKind",
            c.number::text AS number, c.gas_id AS "gasId", g.name::text AS "gasName",
-           c.sent - c.returned AS pending
+           c.pending
       FROM lines c JOIN gases g ON g.id = c.gas_id
      WHERE c.customer_id = ${customerId}::uuid
        AND c.bill_id = ANY(${billIds}::uuid[])
@@ -81,7 +88,7 @@ export function findClearableLines(
   `;
 }
 
-/** The part of a posted return that is matched to one line of a bill. */
+/** The part of a posted return or write-off that is matched to one line of a bill. */
 export interface AllocationToBill {
   clearingLineId: string;
   clearedLineId: string;
@@ -89,12 +96,16 @@ export interface AllocationToBill {
   /** The gas of both lines. */
   gasId: string;
   gasName: string;
-  returnId: string;
-  returnNumber: string;
-  returnDate: Date;
+  clearingBillId: string;
+  clearingType: ClearingType;
+  clearingNumber: string;
+  clearingDate: Date;
 }
 
-/** What posted returns have matched to the lines of the bill, the oldest return first. */
+/**
+ * What posted returns and write-offs have matched to the lines of the bill, the
+ * oldest of those first.
+ */
 export function findAllocationsToBill(
   tx: Transaction,
   billId: string,
@@ -102,18 +113,19 @@ export function findAllocationsToBill(
   return tx.$queryRaw<AllocationToBill[]>`
     SELECT a.clearing_line_id AS "clearingLineId", a.cleared_line_id AS "clearedLineId",
            a.quantity, l.gas_id AS "gasId", g.name::text AS "gasName",
-           rb.id AS "returnId", rb.number::text AS "returnNumber", rb.date AS "returnDate"
+           cb.id AS "clearingBillId", cb.type::text AS "clearingType",
+           cb.number::text AS "clearingNumber", cb.date AS "clearingDate"
       FROM allocations a
       JOIN bill_lines l ON l.id = a.cleared_line_id
       JOIN gases g ON g.id = l.gas_id
-      JOIN bill_lines r ON r.id = a.clearing_line_id
-      JOIN bills rb ON rb.id = r.bill_id
-     WHERE l.bill_id = ${billId}::uuid AND rb.status = 'posted'
-     ORDER BY rb.date, rb.entered_at, rb.id, l.line_no
+      JOIN bill_lines cl ON cl.id = a.clearing_line_id
+      JOIN bills cb ON cb.id = cl.bill_id
+     WHERE l.bill_id = ${billId}::uuid AND cb.status = 'posted'
+     ORDER BY cb.date, cb.entered_at, cb.id, l.line_no
   `;
 }
 
-/** What the customer can return cylinders against on the date. */
+/** What the customer can return or have written off cylinders against on the date. */
 export async function listPending(
   db: Database,
   clock: Clock,
@@ -138,7 +150,7 @@ export async function findPendingRows(
 ): Promise<PendingRow[]> {
   const rows = await db.$queryRaw<Row[]>`
     ${rowsOf(customerId, date)}
-    HAVING SUM(c.sent) > SUM(c.returned)
+    HAVING SUM(c.pending) > 0
     ORDER BY ${OLDEST_FIRST}, MIN(c.line_no)
   `;
   return rows.map(asRow);
@@ -177,7 +189,7 @@ export async function listClosedRows(
   await refuseUnknownCustomer(db, customerId);
   const closed = Prisma.sql`
     ${rowsOf(customerId, date)}
-    HAVING SUM(c.sent) <= SUM(c.returned)
+    HAVING SUM(c.pending) <= 0
   `;
   const [rows, [{ total }]] = await Promise.all([
     db.$queryRaw<Row[]>`
@@ -205,7 +217,7 @@ export async function listReturnCustomers(
   const ids = parties.map((party) => party.id);
   const counts = await db.$queryRaw<{ customerId: string; pending: number }[]>`
     WITH lines AS (${CLEARABLE_LINES})
-    SELECT customer_id AS "customerId", SUM(sent - returned)::int AS pending
+    SELECT customer_id AS "customerId", SUM(pending)::int AS pending
       FROM lines
      WHERE customer_id = ANY(${ids}::uuid[])
      GROUP BY customer_id
@@ -223,8 +235,9 @@ export async function listReturnCustomers(
 }
 
 /**
- * What has come back against a posted dispatch bill or customer's opening stock,
- * or null for any other bill, on which nothing can be pending.
+ * What has come back or been written off against a posted dispatch bill or
+ * customer's opening stock, or null for any other bill, on which nothing can be
+ * pending.
  */
 export async function getBillReturns(
   db: Database,
@@ -251,6 +264,7 @@ export async function getBillReturns(
           bill: {
             select: {
               id: true,
+              type: true,
               number: true,
               date: true,
               enteredBy: { select: { id: true, displayName: true } },
@@ -259,7 +273,7 @@ export async function getBillReturns(
         },
       },
     },
-    // The returns the oldest first, and each one's gases in their order on this bill.
+    // The oldest first, and each one's gases in their order on this bill.
     orderBy: [
       { clearingLine: { bill: { date: "asc" } } },
       { clearingLine: { bill: { enteredAt: "asc" } } },
@@ -269,9 +283,11 @@ export async function getBillReturns(
   });
   const entries = new Map<string, BillReturns["entries"][number]>();
   for (const { quantity, clearedLine, clearingLine } of allocations) {
-    const { date, ...bill } = clearingLine.bill;
+    const { date, type, ...bill } = clearingLine.bill;
     const entry = entries.get(bill.id) ?? {
       ...bill,
+      // Nothing but a return or a write-off is matched to a bill.
+      type: type as ClearingType,
       date: fromDatabaseDate(date),
       quantity: 0,
       gases: [],
@@ -281,22 +297,38 @@ export async function getBillReturns(
     addUp(entry.gases, [{ gas: clearedLine.gas, quantity }]);
   }
   const sent = addUp([], lines);
-  const returned = addUp(
-    [],
-    [...entries.values()].flatMap((entry) => entry.gases),
-  );
+  /** The cylinders of each gas that entries of one type have cleared. */
+  const clearedBy = (type: ClearingType) =>
+    addUp(
+      [],
+      [...entries.values()].filter((entry) => entry.type === type).flatMap((entry) => entry.gases),
+    );
+  const returned = clearedBy("return_from_customer");
+  const writtenOff = clearedBy("write_off");
   const gases = sent.map(({ gas, quantity }) => {
-    const back = returned.find((other) => other.gas.id === gas.id)?.quantity ?? 0;
-    return { gas, sent: quantity, returned: back, pending: quantity - back };
+    const ofThis = (totals: Quantities) =>
+      totals.find((other) => other.gas.id === gas.id)?.quantity ?? 0;
+    const counts = { returned: ofThis(returned), writtenOff: ofThis(writtenOff) };
+    return {
+      gas,
+      sent: quantity,
+      ...counts,
+      pending: quantity - counts.returned - counts.writtenOff,
+    };
   });
-  const total = (of: "sent" | "returned" | "pending") =>
+  const total = (of: "sent" | "returned" | "writtenOff" | "pending") =>
     gases.reduce((sum, gas) => sum + gas[of], 0);
   return {
     sent: total("sent"),
     returned: total("returned"),
+    writtenOff: total("writtenOff"),
     pending: total("pending"),
     status:
-      total("pending") === 0 ? "closed" : total("returned") === 0 ? "open" : "partly_returned",
+      total("pending") === 0
+        ? "closed"
+        : total("pending") === total("sent")
+          ? "open"
+          : "partly_returned",
     gases,
     entries: [...entries.values()],
   };
@@ -337,6 +369,8 @@ interface Row {
   gasName: string;
   sent: number;
   returned: number;
+  writtenOff: number;
+  pending: number;
 }
 
 /**
@@ -349,20 +383,32 @@ function rowsOf(customerId: string, date: string): Prisma.Sql {
     SELECT c.bill_id AS "billId", c.type::text AS type, c.paper_kind::text AS "paperKind",
            c.number::text AS number, c.date,
            c.gas_id AS "gasId", g.name::text AS "gasName",
-           SUM(c.sent)::int AS sent, SUM(c.returned)::int AS returned
+           SUM(c.sent)::int AS sent, SUM(c.returned)::int AS returned,
+           SUM(c.written_off)::int AS "writtenOff", SUM(c.pending)::int AS pending
       FROM lines c JOIN gases g ON g.id = c.gas_id
      WHERE c.customer_id = ${customerId}::uuid AND c.date <= ${date}::date
      GROUP BY c.bill_id, c.type, c.paper_kind, c.number, c.date, c.entered_at, c.gas_id, g.name
   `;
 }
 
-function asRow({ billId, date, gasId, gasName, sent, returned, ...bill }: Row): PendingRow {
+function asRow({
+  billId,
+  date,
+  gasId,
+  gasName,
+  sent,
+  returned,
+  writtenOff,
+  pending,
+  ...bill
+}: Row): PendingRow {
   return {
     bill: { id: billId, date: fromDatabaseDate(date), ...bill },
     gas: { id: gasId, name: gasName },
     sent,
     returned,
-    pending: sent - returned,
+    writtenOff,
+    pending,
   };
 }
 

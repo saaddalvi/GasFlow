@@ -134,6 +134,12 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     ...change,
   });
 
+  /** Asks to write off a customer's cylinders, as the admin unless told otherwise. */
+  const postCustomerWriteOff = (
+    payload: object,
+    { headers }: { headers: Record<string, string> } = admin,
+  ) => app.inject({ method: "POST", url: "/api/customer-write-offs", headers, payload });
+
   let billsNumbered = 0;
 
   /**
@@ -239,6 +245,33 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     const response = await postReturn(returnFor(customerId, allocations, change));
     expect(response.statusCode).toBe(201);
     return receivedReturnSchema.parse(response.json());
+  }
+
+  /**
+   * What the new bill form sends to write off a customer's cylinders, against a gas
+   * on a bill. A test changes whatever matters to it.
+   */
+  const customerWriteOffFor = (
+    customerId: string,
+    bill: { id: string },
+    name: string,
+    quantity: number,
+    change: object = {},
+  ) => ({
+    customerId,
+    billId: bill.id,
+    gasId: gas(name).id,
+    quantity,
+    date: "2026-11-26",
+    writeOffReason: "lost",
+    ...change,
+  });
+
+  /** Writes off a customer's cylinders, expecting that to be saved. */
+  async function customerWriteOff(...asked: Parameters<typeof customerWriteOffFor>) {
+    const response = await postCustomerWriteOff(customerWriteOffFor(...asked));
+    expect(response.statusCode).toBe(201);
+    return billSchema.parse(response.json());
   }
 
   /** Asks to match unmatched cylinders on a return, as the staff member unless told otherwise. */
@@ -425,6 +458,9 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     postBill,
     addCylindersFor,
     writeOffFor,
+    postCustomerWriteOff,
+    customerWriteOffFor,
+    customerWriteOff,
     dispatchFor,
     dispatch,
     sendFor,

@@ -79,7 +79,7 @@ export const receivedReturnSchema = z.object({
 
 export type ReceivedReturn = z.infer<typeof receivedReturnSchema>;
 
-/** Asks what a customer can return cylinders against on a date. */
+/** Asks what a customer can return or have written off cylinders against on a date. */
 export const pendingQuerySchema = z.object({
   customerId: z.uuid("Choose a customer."),
   date: z.iso.date("Choose the return date."),
@@ -93,6 +93,7 @@ export const pendingRowSchema = z.object({
   gas: gasSchema.pick({ id: true, name: true }),
   sent: z.int().positive(),
   returned: z.int().nonnegative(),
+  writtenOff: z.int().nonnegative(),
   pending: z.int().nonnegative(),
 });
 

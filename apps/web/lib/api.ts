@@ -110,7 +110,7 @@ export async function fetchReturnCustomers({
   return returnCustomerListSchema.parse(await getJson(`/api/returns/customers?${query}`));
 }
 
-/** What the customer can return cylinders against on the date. */
+/** What the customer can return or have written off cylinders against on the date. */
 export async function fetchPending(query: PendingQuery): Promise<PendingList> {
   return pendingListSchema.parse(
     await getJson(`/api/returns/pending?${new URLSearchParams(query).toString()}`),

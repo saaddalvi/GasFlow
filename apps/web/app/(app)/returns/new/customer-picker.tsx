@@ -8,17 +8,17 @@ type Customer = ReturnCustomerList["customers"][number];
 
 /**
  * A box to search the active customers by name and choose one, each shown with
- * what they have pending.
+ * what they have pending. Receive empties and a customer's write-off use it.
  */
 export function CustomerPicker({
   chosen,
   onChoose,
-  focused,
+  focused = false,
 }: {
   chosen: Choice | null;
   onChoose: (customer: Choice | null) => void;
   /** Whether the box takes the focus, so that typing can start at once. */
-  focused: boolean;
+  focused?: boolean;
 }) {
   return (
     <SearchPicker

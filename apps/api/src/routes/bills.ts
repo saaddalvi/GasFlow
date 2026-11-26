@@ -7,6 +7,7 @@ import {
   billSchema,
   newBillSchema,
   newCancellationSchema,
+  newCustomerWriteOffSchema,
   refillerRefillerSlipNumberUseQuerySchema,
 } from "@gasflow/shared";
 import type { FastifyInstance } from "fastify";
@@ -19,7 +20,7 @@ import {
   listBills,
   noSuchBill,
 } from "../services/bills";
-import { cancelBill, correctBill, enterBill } from "../services/ledger";
+import { cancelBill, correctBill, enterBill, writeOffFromCustomer } from "../services/ledger";
 import { idParam } from "./id-param";
 
 /**
@@ -45,6 +46,15 @@ export function billRoutes(app: FastifyInstance, { db, clock }: AppDependencies)
   app.post("/api/bills", async (request, reply) => {
     const bill = parseRequest(newBillSchema, request.body);
     const billId = await enterBill(db, clock, request.staff, bill);
+    reply.code(201);
+    return billSchema.parse(await getBill(db, billId));
+  });
+
+  // A customer's cylinders are written off against one of the bills they went out
+  // on. Who may do that is the ledger's to say.
+  app.post("/api/customer-write-offs", async (request, reply) => {
+    const writeOff = parseRequest(newCustomerWriteOffSchema, request.body);
+    const billId = await writeOffFromCustomer(db, clock, request.staff, writeOff);
     reply.code(201);
     return billSchema.parse(await getBill(db, billId));
   });

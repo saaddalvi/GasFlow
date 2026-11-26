@@ -202,8 +202,8 @@ model BillLine {
   quantity  Int
   bill      Bill         @relation(fields: [billId], references: [id])
   gas       Gas          @relation(fields: [gasId], references: [id])
-  /// On a return, what its quantity is matched to. Any of the quantity that none
-  /// of these covers is unmatched.
+  /// On a return or a customer's write-off, what its quantity is matched to. Any
+  /// of a return's quantity that none of these covers is unmatched.
   clears    Allocation[] @relation("clearing_line")
   /// On a dispatch bill or opening stock, what has been matched to it.
   clearedBy Allocation[] @relation("cleared_line")
@@ -230,12 +230,12 @@ model BillRevision {
   @@map("bill_revisions")
 }
 
-/// The part of a return that is matched to a line of a dispatch bill or opening
-/// stock for the same customer and gas, dated no later than the return. It counts
-/// only while the return is posted.
+/// The part of a return or customer write-off that is matched to a line of a
+/// dispatch bill or opening stock for the same customer and gas, dated no later
+/// than it. It counts only while that return or write-off is posted.
 model Allocation {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  /// The line of the return.
+  /// The line of the return or write-off.
   clearingLineId String   @map("clearing_line_id") @db.Uuid
   /// The line whose pending cylinders it clears.
   clearedLineId  String   @map("cleared_line_id") @db.Uuid

@@ -4,6 +4,7 @@ import {
   checkInput,
   FILL_STATES,
   newBillSchema,
+  newCustomerWriteOffSchema,
   WRITE_OFF_REASONS,
   whyNotEnter,
   type Bill,
@@ -36,11 +37,13 @@ import { holdEnter } from "@/lib/hold-enter";
 import { billPath, BILLS_PATH } from "@/lib/routes";
 import { useLastGiven } from "@/lib/use-last-given";
 import { vehicleName } from "@/lib/vehicle-names";
+import { CustomerPicker } from "../../returns/new/customer-picker";
 import { correctBill } from "../actions";
-import { saveBill } from "./actions";
+import { saveBill, saveCustomerWriteOff } from "./actions";
 import { BillNumberFields, RefillerSlipNumberField } from "./bill-number-fields";
 import { NewPartyDialog } from "./new-party-dialog";
 import { PartyPicker, type ChosenParty } from "./party-picker";
+import { WrittenOffCylinders } from "./written-off-cylinders";
 
 /** What the form offers, and the dates it starts from. */
 export interface FormChoices {
@@ -81,8 +84,11 @@ const BILL_FORMS: Record<
   write_off: { partyType: "refiller", fillState: "defective", fromPaper: false },
 };
 
-/** Where a write-off can be from, as far as this form goes. */
-type WrittenOffFrom = "shop" | "refiller";
+/**
+ * Where a write-off can be from. A customer's is entered against one of their bills,
+ * rather than as lines, and is never corrected.
+ */
+type WrittenOffFrom = "shop" | "refiller" | "customer";
 
 export function BillForm({
   choices,
@@ -128,17 +134,40 @@ function Form({
   );
   const [newName, setNewName] = useState("");
   const [lines, setLines] = useState(() => (bill ? asFormLines(bill.lines) : [blankLine(1)]));
-  // How many saves have been turned down, each of which may mean the number is taken.
+  // How many saves have been turned down, each of which may mean the number is
+  // taken, or that less is pending than was listed.
   const [refusals, setRefusals] = useState(0);
   const newParty = useRef<ActionDialogHandle>(null);
-  const { partyType, partyOptional, fillState: defaultFillState, fromPaper } = BILL_FORMS[type];
+  const { partyOptional, fillState: defaultFillState, fromPaper } = BILL_FORMS[type];
+  const fromCustomer = type === "write_off" && writtenOffFrom === "customer";
+  const partyType = fromCustomer ? "customer" : BILL_FORMS[type].partyType;
   const party = chosen[partyType] ?? null;
   // A write-off from the shop names nobody else.
-  const namesParty = type !== "write_off" || writtenOffFrom === "refiller";
+  const namesParty = type !== "write_off" || writtenOffFrom !== "shop";
   const choose = (party: ChosenParty | null) =>
     setChosen((chosen) => ({ ...chosen, [partyType]: party }));
 
   async function submit(form: FormData): Promise<Outcome> {
+    const outcome = fromCustomer ? await submitWriteOff(form) : await submitLines(form);
+    if (outcome.error) setRefusals((count) => count + 1);
+    return outcome;
+  }
+
+  async function submitWriteOff(form: FormData): Promise<Outcome> {
+    const { data, problem } = checkInput(newCustomerWriteOffSchema, {
+      customerId: party?.id ?? "",
+      // Absent while the pending cylinders are not listed.
+      billId: form.get("billId") ?? "",
+      gasId: form.get("gasId") ?? "",
+      quantity: Number(form.get("quantity")),
+      writeOffReason: form.get("writeOffReason"),
+      date,
+      notes: form.get("notes"),
+    });
+    return data ? saveCustomerWriteOff(data) : { error: problem };
+  }
+
+  async function submitLines(form: FormData): Promise<Outcome> {
     // The check leaves out whatever is no part of a bill of this type.
     const { data, problem } = checkInput(newBillSchema, {
       type,
@@ -151,13 +180,10 @@ function Form({
       notes: form.get("notes"),
       lines: asNewLines(lines, defaultFillState),
     });
-    const outcome = !data
-      ? { error: problem }
-      : bill
-        ? await correctBill(bill.id, data)
-        : await saveBill(data);
-    if (outcome.error) setRefusals((count) => count + 1);
-    return outcome;
+    if (!data) {
+      return { error: problem };
+    }
+    return bill ? correctBill(bill.id, data) : saveBill(data);
   }
 
   /** Adds a line for each gas that has none, in place of any left wholly blank. */
@@ -228,20 +254,28 @@ function Form({
               >
                 <option value="shop">The shop</option>
                 <option value="refiller">A refiller</option>
+                {/* No saved write-off can be corrected to be from a customer. */}
+                {!bill && <option value="customer">A customer</option>}
               </SelectField>
             )}
-            {namesParty && (
-              <PartyPicker
-                key={partyType}
-                type={partyType}
-                chosen={party}
-                onChoose={choose}
-                onNew={(typed) => {
-                  setNewName(typed);
-                  newParty.current?.open();
-                }}
-                optional={partyOptional}
-              />
+            {fromCustomer ? (
+              // Only a customer with cylinders pending has any to write off, so no
+              // new one is offered.
+              <CustomerPicker chosen={party} onChoose={choose} />
+            ) : (
+              namesParty && (
+                <PartyPicker
+                  key={partyType}
+                  type={partyType}
+                  chosen={party}
+                  onChoose={choose}
+                  onNew={(typed) => {
+                    setNewName(typed);
+                    newParty.current?.open();
+                  }}
+                  optional={partyOptional}
+                />
+              )
             )}
             {type === "write_off" && (
               <SelectField
@@ -272,32 +306,60 @@ function Form({
               <TextAreaField label="Notes" name="notes" defaultValue={bill?.notes ?? ""} />
             </div>
           </div>
-          <fieldset className="min-w-0 space-y-3 border-t border-slate-100 pt-4">
-            <legend className="float-left w-full font-semibold">Lines</legend>
-            {lines.some((line) => line.optional) && (
-              <p className="clear-left text-sm text-slate-500">
-                Leave the quantity blank for a gas that is not on the {fromPaper ? "paper" : "bill"}
-                .
-              </p>
-            )}
-            <LineList
-              lines={lines}
-              onChange={setLines}
-              gases={gases}
-              defaultFillState={defaultFillState}
-            >
-              <button type="button" onClick={addEveryGas} className={buttonStyles.secondary}>
-                + One line per gas
-              </button>
-            </LineList>
-            <Totals lines={lines} defaultFillState={defaultFillState} />
-          </fieldset>
+          {fromCustomer ? (
+            <fieldset className="min-w-0 space-y-3 border-t border-slate-100 pt-4">
+              <legend className="float-left w-full font-semibold">Pending cylinders</legend>
+              <div className="clear-left">
+                {!party ? (
+                  <Note>Choose a customer to see what they have pending.</Note>
+                ) : date < startDate ? (
+                  <Note>
+                    {date
+                      ? "A write-off cannot be dated before the start date."
+                      : "Choose the bill date."}
+                  </Note>
+                ) : (
+                  <WrittenOffCylinders
+                    key={party.id}
+                    customer={party}
+                    date={date}
+                    askAgain={refusals}
+                  />
+                )}
+              </div>
+            </fieldset>
+          ) : (
+            <fieldset className="min-w-0 space-y-3 border-t border-slate-100 pt-4">
+              <legend className="float-left w-full font-semibold">Lines</legend>
+              {lines.some((line) => line.optional) && (
+                <p className="clear-left text-sm text-slate-500">
+                  Leave the quantity blank for a gas that is not on the{" "}
+                  {fromPaper ? "paper" : "bill"}.
+                </p>
+              )}
+              <LineList
+                lines={lines}
+                onChange={setLines}
+                gases={gases}
+                defaultFillState={defaultFillState}
+              >
+                <button type="button" onClick={addEveryGas} className={buttonStyles.secondary}>
+                  + One line per gas
+                </button>
+              </LineList>
+              <Totals lines={lines} defaultFillState={defaultFillState} />
+            </fieldset>
+          )}
         </ActionForm>
       </section>
       {/* Outside the bill's form, since one form cannot sit inside another. */}
       <NewPartyDialog ref={newParty} type={partyType} name={newName} onAdded={choose} />
     </div>
   );
+}
+
+function Note({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-slate-500">{children}</p>;
 }
 
 /** The party a bill names beside the shop, if any. */

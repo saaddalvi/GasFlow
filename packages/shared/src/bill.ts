@@ -93,33 +93,52 @@ export const billLineSchema = z.object({
 
 export type BillLine = z.infer<typeof billLineSchema>;
 
-/** How much of a bill has come back: none, some or all of it. */
+/**
+ * How much of a bill has been cleared, by cylinders coming back or being written
+ * off: none, some or all of it.
+ */
 export const returnStatusSchema = z.enum(["open", "partly_returned", "closed"]);
 
 export type ReturnStatus = z.infer<typeof returnStatusSchema>;
 
 const billGasSchema = gasSchema.pick({ id: true, name: true });
 
-/** Counts of the cylinders a bill sent, those since returned and those still pending. */
+/** The types of bill that clear pending cylinders. */
+const clearingTypeSchema = billTypeSchema.extract(["return_from_customer", "write_off"]);
+
+export type ClearingType = z.infer<typeof clearingTypeSchema>;
+
+/**
+ * Counts of the cylinders a bill sent, those since returned, those since written
+ * off and those still pending.
+ */
 const returnCounts = {
   sent: z.int().positive(),
   returned: z.int().nonnegative(),
+  writtenOff: z.int().nonnegative(),
   pending: z.int().nonnegative(),
 };
 
-/** What has come back against a bill that cylinders can be pending on. */
+/**
+ * What has come back or been written off against a bill that cylinders can be
+ * pending on.
+ */
 export const billReturnsSchema = z.object({
   ...returnCounts,
   status: returnStatusSchema,
   /** One for each gas on the bill, however many lines it is on. */
   gases: z.array(z.object({ gas: billGasSchema, ...returnCounts })),
-  /** Each posted return with cylinders matched to this bill, the oldest first. */
+  /**
+   * Each posted return and write-off with cylinders matched to this bill, the
+   * oldest first.
+   */
   entries: z.array(
     z.object({
       id: z.uuid(),
+      type: clearingTypeSchema,
       number: z.string().min(1),
       date: dateSchema,
-      /** The cylinders matched to this bill, which may be only part of the return. */
+      /** The cylinders matched to this bill, which may be only part of a return's. */
       quantity: z.int().positive(),
       gases: z.array(z.object({ gas: billGasSchema, quantity: z.int().positive() })),
       enteredBy: billStaffSchema,
@@ -301,15 +320,21 @@ export function whyNotCorrect(bill: Entered, staff: Asker, today: string): strin
 export function whyUncorrectable({
   type,
   status,
+  from,
 }: {
   type: BillType;
   status: BillStatus;
+  /** Whom the cylinders leave, which tells apart the write-offs. */
+  from: Pick<BillParty, "type"> | null;
 }): string | null {
   if (type === "return_from_customer") {
     return "A return cannot be corrected. Cancel it and record it again.";
   }
   if (status === "cancelled") {
     return "This bill has been cancelled, so it cannot be corrected.";
+  }
+  if (type === "write_off" && from?.type === "customer") {
+    return "A write-off from a customer cannot be corrected. Cancel it and enter it again.";
   }
   return null;
 }
@@ -456,8 +481,8 @@ export type NewAddCylinders = z.infer<typeof newAddCylindersSchema>;
 
 /**
  * Cylinders scrapped or lost at the shop or a refiller, as they are entered. A
- * customer's are written off against a bill, and so are not entered like this. The
- * app gives the bill its number.
+ * customer's are written off against a bill, and are entered as
+ * newCustomerWriteOffSchema says. The app gives the bill its number.
  */
 export const newWriteOffSchema = z.object({
   type: z.literal("write_off", CHOOSE_TYPE),
@@ -469,7 +494,25 @@ export const newWriteOffSchema = z.object({
 
 export type NewWriteOff = z.infer<typeof newWriteOffSchema>;
 
-/** A bill of any type the new bill form offers. */
+/**
+ * Cylinders a customer has scrapped or lost, as they are entered: some of one gas
+ * pending on a dispatch bill or the customer's opening stock, which they then no
+ * longer are. The app gives the bill its number.
+ */
+export const newCustomerWriteOffSchema = z.object({
+  // In small letters, as the database gives ids back, so that they can be matched.
+  customerId: z.uuid("Choose a customer.").toLowerCase(),
+  billId: z.uuid("Choose the pending cylinders to write off.").toLowerCase(),
+  gasId: z.uuid("Choose the pending cylinders to write off.").toLowerCase(),
+  quantity: quantitySchema,
+  writeOffReason: writeOffReasonSchema,
+  date: formFields.date,
+  notes: formFields.notes,
+});
+
+export type NewCustomerWriteOff = z.infer<typeof newCustomerWriteOffSchema>;
+
+/** A bill of any type the new bill form saves as a bill's lines. */
 export const newBillSchema = z.discriminatedUnion(
   "type",
   [
@@ -492,7 +535,8 @@ export const openingStockCorrectionSchema = z.object({
 
 /**
  * A posted bill as it is to read once corrected, which is all of it again. Its
- * type cannot change, and a return from a customer is never corrected.
+ * type cannot change, and neither a return from a customer nor a write-off from
+ * one is ever corrected.
  */
 export const billCorrectionSchema = z.discriminatedUnion(
   "type",
