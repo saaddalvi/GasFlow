@@ -226,7 +226,9 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
                 <>
                   {(Boolean(rows?.length) || askedSplit) && (
                     <FillOldestFirst
-                      key={customer.id}
+                      // Not the key of the closed rows beside it: two alike would
+                      // leave a second copy on screen.
+                      key={`split ${customer.id}`}
                       rows={rows ?? []}
                       customerName={customer.name}
                       asked={askedSplit}
@@ -245,7 +247,7 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
                     onRetry={() => setRetries(retries + 1)}
                   />
                   <ClosedRows
-                    key={customer.id}
+                    key={`closed ${customer.id}`}
                     customerId={customer.id}
                     date={date}
                     askAgain={saves}
