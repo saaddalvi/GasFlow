@@ -68,3 +68,18 @@ For later tickets:
 - Ticket 12: allocations point at bill lines, so a correction has to keep those lines.
 - Ticket 14: `CLEARABLE_LINES` and `getBillReturns` treat every posted allocation as a return. Write-offs have to be told apart in both.
 - Ticket 17: the Receive empties form cannot yet be opened with a customer already chosen.
+
+**26 November 2026: checks run in a browser. All passed except the real phone, which is still to do.**
+
+Run in headless Chrome through the Playwright MCP against commit `44ac838`, signed in with real Clerk development accounts: an admin set the start date and entered opening stock, and a staff account entered the dispatch bills. The app and the database were copies, with the two new migrations applied to the copy only, and the figures were made up, not taken from paper copies.
+
+- **Opening stock and several dispatch bills, then each bill page, Bills and the Stock report: passed.** One return of 20 cylinders (RET-20261126-001, slip S-55) covered opening stock and bills 101 and 102 in all three fill states. The bill pages showed the right sent, returned, pending, tags and return entries; **Bills** listed the return; the shop's counts rose in the chosen fill states and the totals did not change. After all the returns, the Stock report was right for today and for 15 November, which had a back-dated return.
+- **Two people returning against the same bill: passed**, with an admin and a staff account each saving from a list loaded before the other saved. Asking for more than was left saved nothing and named what was pending. A row closed by the colleague left the list, with a warning about the quantity typed on it. Two quantities that both fitted both saved. Two requests of 5 against 7 pending, sent to the API at once, saved only one.
+- **A real phone: still to do.** As a stand-in, Chrome emulated a phone with touch, 390 and 320 wide. Returns saved at both widths with the confirmation in view, and Receive empties did not scroll sideways. A real keyboard and Safari have not been tried.
+- Also passed: the picker is focused on load and shows pending totals; rows are oldest first, with two lines of one gas on one row; changing the date changes the rows offered; a date before the start date is refused; Enter does not save; the API refuses a request without sign-in, a date before the bill or the start date, too many cylinders, another customer's bill and an inactive customer; a lost connection during a save keeps what was typed and says to check whether it was saved.
+
+Found during the checks and fixed afterwards. The fixes were checked in the same browser, on a fresh copy:
+
+- At 320 wide, the table under **Returns** on a bill page was wider than its box, so **Pending** was out of view until the table was swiped. Below 640 wide it now has smaller headings and less padding. It fits at 320 with the longest gas name and four-digit counts.
+- In the list of returns on that page, each "returned" total sat at a different horizontal position on a narrow phone. They now line up at the right edge.
+- After a refused save, the message stayed while the browser's own check blocked the next try. It now goes. This is in `ActionForm`, so it applies to every screen that uses it. A message still stays while fields are being changed, until the next try, as noted in ticket 07.
