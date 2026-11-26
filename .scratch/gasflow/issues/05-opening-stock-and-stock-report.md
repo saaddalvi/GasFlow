@@ -6,18 +6,18 @@
 
 **Status:** ready-for-agent
 
-- [ ] An admin sets the start date once during setup
-- [ ] An admin enters a party's opening stock as lines of gas, fill state and quantity; suppliers are not offered
-- [ ] Opening stock is always dated the start date, is numbered automatically, and is posted when saved
-- [ ] A second opening stock for the same party is refused, including when two are saved at the same moment
-- [ ] Staff who are not admins cannot enter opening stock
-- [ ] Existing opening stock entries are listed and each can be viewed, showing who entered it and when
-- [ ] Every bill change goes through one ledger module that checks rules and writes in a single database transaction
-- [ ] The Stock report shows, by gas, the shop as Filled, Empty and Defective, then With customers, At refiller and Total, calculated from posted bills with no stored stock count
-- [ ] Customer and refiller counts add quantities across fill states
-- [ ] The report has a date picker, month-end shortcuts and previous and next day; dates before the start date show nothing
-- [ ] Negative counts are shown in a red cell
-- [ ] API tests enter opening stock and assert the report figures
+- [x] An admin sets the start date once during setup
+- [x] An admin enters a party's opening stock as lines of gas, fill state and quantity; suppliers are not offered
+- [x] Opening stock is always dated the start date, is numbered automatically, and is posted when saved
+- [x] A second opening stock for the same party is refused, including when two are saved at the same moment
+- [x] Staff who are not admins cannot enter opening stock
+- [x] Existing opening stock entries are listed and each can be viewed, showing who entered it and when
+- [x] Every bill change goes through one ledger module that checks rules and writes in a single database transaction
+- [x] The Stock report shows, by gas, the shop as Filled, Empty and Defective, then With customers, At refiller and Total, calculated from posted bills with no stored stock count
+- [x] Customer and refiller counts add quantities across fill states
+- [x] The report has a date picker, month-end shortcuts and previous and next day; dates before the start date show nothing
+- [x] Negative counts are shown in a red cell
+- [x] API tests enter opening stock and assert the report figures
 
 ## Comments
 
@@ -59,3 +59,9 @@ For later tickets:
 - Only `apps/api/src/services/ledger.ts` changes bills. A bill moves cylinders from `fromPartyId` to `toPartyId`; a blank side is outside the business.
 - The Stock report already subtracts what leaves a party, which no test can reach until there is a dispatch.
 - Ticket 12: bill lines are unique by bill and line number, so renumbering lines that stay needs two steps.
+
+**26 November 2026: completed** in commit `bb5de85`. It is pushed, and [CI passed](https://github.com/saaddalvi/GasFlow/actions/runs/45786807915) at `070317c`.
+
+- The project owner asked for the ticket to be marked completed. No results of the signed-in checks under "Still to do" were recorded here.
+- Both new migrations were applied to the development database.
+- The decisions listed for the project owner are not recorded as settled.
