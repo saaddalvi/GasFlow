@@ -12,7 +12,12 @@ export const fillStateSchema = z.enum(FILL_STATES, "Choose filled, empty or defe
 
 export type FillState = z.infer<typeof fillStateSchema>;
 
-export const billTypeSchema = z.enum(["opening_stock", "dispatch"]);
+export const billTypeSchema = z.enum([
+  "opening_stock",
+  "dispatch",
+  "send_to_refiller",
+  "return_from_refiller",
+]);
 
 export type BillType = z.infer<typeof billTypeSchema>;
 
@@ -138,24 +143,73 @@ export const billNumberSchema = requiredText({
   tooLong: "Use a bill number of at most 30 characters.",
 });
 
-/**
- * A dispatch bill as it is entered. The cylinders always leave the shop, so only
- * the customer is named.
- */
-export const newDispatchSchema = z.object({
-  type: z.literal("dispatch", "Choose the type of bill."),
-  paperKind: paperKindSchema,
-  number: billNumberSchema,
+const CHOOSE_TYPE = "Choose the type of bill.";
+
+const refillerIdSchema = z.uuid("Choose a refiller.");
+
+/** What every bill entered from paper says, besides its number and its party. */
+const paperFields = {
   date: z.iso.date("Choose the bill date."),
-  customerId: z.uuid("Choose a customer."),
   vehicleId: z.uuid("Choose a vehicle from the list.").nullable().default(null),
   notes: optionalText({ max: 1000, tooLong: "Use notes of at most 1000 characters." }).default(
     null,
   ),
   lines: newBillLinesSchema,
+};
+
+/**
+ * A dispatch bill as it is entered. The cylinders always leave the shop, so only
+ * the customer is named.
+ */
+export const newDispatchSchema = z.object({
+  type: z.literal("dispatch", CHOOSE_TYPE),
+  paperKind: paperKindSchema,
+  number: billNumberSchema,
+  customerId: z.uuid("Choose a customer."),
+  ...paperFields,
 });
 
 export type NewDispatch = z.infer<typeof newDispatchSchema>;
+
+/** A send to a refiller as it is entered, also numbered from the agency's paper. */
+export const newSendToRefillerSchema = z.object({
+  type: z.literal("send_to_refiller", CHOOSE_TYPE),
+  paperKind: paperKindSchema,
+  number: billNumberSchema,
+  refillerId: refillerIdSchema,
+  ...paperFields,
+});
+
+export type NewSendToRefiller = z.infer<typeof newSendToRefillerSchema>;
+
+/**
+ * A refiller's slip number, which is the bill number of a return from that
+ * refiller. Not the optional slip number noted on a customer's return.
+ */
+export const refillerSlipNumberSchema = requiredText({
+  missing: "Enter the refiller's slip number.",
+  max: 30,
+  tooLong: "Use a slip number of at most 30 characters.",
+});
+
+/** A return from a refiller as it is entered, under the refiller's slip number. */
+export const newReturnFromRefillerSchema = z.object({
+  type: z.literal("return_from_refiller", CHOOSE_TYPE),
+  number: refillerSlipNumberSchema,
+  refillerId: refillerIdSchema,
+  ...paperFields,
+});
+
+export type NewReturnFromRefiller = z.infer<typeof newReturnFromRefillerSchema>;
+
+/** A bill of any type the new bill form offers. */
+export const newBillSchema = z.discriminatedUnion(
+  "type",
+  [newDispatchSchema, newSendToRefillerSchema, newReturnFromRefillerSchema],
+  CHOOSE_TYPE,
+);
+
+export type NewBill = z.infer<typeof newBillSchema>;
 
 /** Asks whether a number is taken, while it is being typed. */
 export const billNumberUseQuerySchema = z.object({
@@ -165,8 +219,16 @@ export const billNumberUseQuerySchema = z.object({
 
 export type BillNumberUseQuery = z.infer<typeof billNumberUseQuerySchema>;
 
+/** Asks whether a refiller's slip number is taken, while it is being typed. */
+export const refillerRefillerSlipNumberUseQuerySchema = z.object({
+  refillerId: refillerIdSchema,
+  number: refillerSlipNumberSchema,
+});
+
+export type RefillerSlipNumberUseQuery = z.infer<typeof refillerRefillerSlipNumberUseQuerySchema>;
+
 export const billNumberUseSchema = z.object({
-  /** The posted bill that has the number on this paper kind, or null if it is free. */
+  /** The posted bill that has the number, or null if it is free. */
   usedBy: billSchema.pick({ id: true, date: true }).nullable(),
 });
 

@@ -4,22 +4,25 @@ import { checkInput, newPartySchema, type Party } from "@gasflow/shared";
 import { ActionDialog, type ActionDialogHandle } from "@/components/action-dialog";
 import { Field, TextAreaField } from "@/components/fields";
 import type { Outcome } from "@/lib/api";
-import { addCustomer } from "./actions";
+import { addParty } from "./actions";
+import type { PickableType } from "./party-picker";
 
-/** Adds a customer from a bill, leaving what has been entered on the bill as it is. */
-export function NewCustomerDialog({
+/** Adds a party from a bill, leaving what has been entered on the bill as it is. */
+export function NewPartyDialog({
   ref,
+  type,
   name,
   onAdded,
 }: {
   ref: React.Ref<ActionDialogHandle>;
+  type: PickableType;
   /** What was typed in the picker, to begin the name with. */
   name: string;
-  onAdded: (customer: Party) => void;
+  onAdded: (party: Party) => void;
 }) {
   async function submit(form: FormData): Promise<Outcome> {
     const { data, problem } = checkInput(newPartySchema, {
-      type: "customer",
+      type,
       name: form.get("name"),
       mobile: form.get("mobile"),
       contactPerson: form.get("contactPerson"),
@@ -28,7 +31,7 @@ export function NewCustomerDialog({
     if (!data) {
       return { error: problem };
     }
-    const { added, ...outcome } = await addCustomer(data);
+    const { added, ...outcome } = await addParty(data);
     if (added) onAdded(added);
     return outcome;
   }
@@ -36,10 +39,10 @@ export function NewCustomerDialog({
   return (
     <ActionDialog
       ref={ref}
-      title="New customer"
-      description="The bill stays as it is. More details can be added on the customer's page later."
+      title={`New ${type}`}
+      description={`The bill stays as it is. More details can be added on the ${type}'s page later.`}
       action={submit}
-      submitLabel="Add customer"
+      submitLabel={`Add ${type}`}
     >
       <Field label="Name" name="name" required defaultValue={name} autoComplete="off" />
       <Field label="Mobile" name="mobile" type="tel" autoComplete="off" />

@@ -1,24 +1,33 @@
 "use client";
 
-import { partyListSchema, type Party, type PartyList } from "@gasflow/shared";
+import { partyListSchema, type Party, type PartyList, type PartyType } from "@gasflow/shared";
 import { useEffect, useId, useRef, useState } from "react";
 import { buttonStyles } from "@/components/button-styles";
 import { controlStyles, Labelled } from "@/components/fields";
+import { PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { NEW_BILL_PATH } from "@/lib/routes";
 import { useLookup, type Lookup } from "@/lib/use-lookup";
 
-/** The customer on a bill, as much of one as the picker shows. */
-export type ChosenCustomer = Pick<Party, "id" | "name">;
+/** The types of party a bill entered from paper can name. */
+export type PickableType = Extract<PartyType, "customer" | "refiller">;
 
-/** A box to search the active customers by name and choose one, or to add one. */
-export function CustomerPicker({
+/** The party on a bill, as much of one as the picker shows. */
+export type ChosenParty = Pick<Party, "id" | "name">;
+
+/**
+ * A box to search the active customers or refillers by name and choose one, or to
+ * add one. Give it a key of its type, so that it starts afresh for another.
+ */
+export function PartyPicker({
+  type,
   chosen,
   onChoose,
   onNew,
 }: {
-  chosen: ChosenCustomer | null;
-  onChoose: (customer: ChosenCustomer | null) => void;
-  /** Called with what has been typed, to begin the new customer's name. */
+  type: PickableType;
+  chosen: ChosenParty | null;
+  onChoose: (party: ChosenParty | null) => void;
+  /** Called with what has been typed, to begin the new party's name. */
   onNew: (typed: string) => void;
 }) {
   const id = useId();
@@ -28,10 +37,10 @@ export function CustomerPicker({
   // The option that Enter would choose, moved with the arrow keys.
   const [marked, setMarked] = useState(0);
   const list = useRef<HTMLUListElement>(null);
-  // Once a customer is chosen the box shows their name, and a fresh look lists everyone.
+  // Once a party is chosen the box shows their name, and a fresh look lists everyone.
   const search = chosen ? "" : typed;
   const answer = useLookup(
-    open ? `${NEW_BILL_PATH}/customers?search=${encodeURIComponent(search)}` : null,
+    open ? `${NEW_BILL_PATH}/parties?${new URLSearchParams({ type, search }).toString()}` : null,
     partyListSchema,
   );
   const found = answer?.data?.parties ?? [];
@@ -42,14 +51,14 @@ export function CustomerPicker({
     list.current?.children[marked]?.scrollIntoView({ block: "nearest" });
   }, [marked]);
 
-  // The list always opens, and changes, with its first customer marked.
+  // The list always opens, and changes, with its first party marked.
   function show() {
     setMarked(0);
     setOpen(true);
   }
 
-  function choose(customer: Party) {
-    onChoose({ id: customer.id, name: customer.name });
+  function choose(party: Party) {
+    onChoose({ id: party.id, name: party.name });
     setOpen(false);
   }
 
@@ -63,17 +72,17 @@ export function CustomerPicker({
         setMarked((marked + step + found.length) % found.length);
       }
     } else if (event.key === "Enter") {
-      // Enter chooses a customer here. It never saves the bill.
+      // Enter chooses a party here. It never saves the bill.
       event.preventDefault();
-      const customer = open ? found[marked] : undefined;
-      if (customer) choose(customer);
+      const party = open ? found[marked] : undefined;
+      if (party) choose(party);
     } else if (event.key === "Escape") {
       setOpen(false);
     }
   }
 
   return (
-    <Labelled label="Customer" required>
+    <Labelled label={PARTY_TYPE_NAMES[type]} required>
       {({ id: inputId }) => (
         <>
           <div className="relative flex min-w-0 flex-1">
@@ -109,28 +118,26 @@ export function CustomerPicker({
                   ref={list}
                   id={listId}
                   role="listbox"
-                  aria-label="Customers"
+                  aria-label={`${PARTY_TYPE_NAMES[type]}s`}
                   className="max-h-64 overflow-y-auto"
                 >
-                  {found.map((customer, index) => (
+                  {found.map((party, index) => (
                     <li
-                      key={customer.id}
+                      key={party.id}
                       id={optionId(index)}
                       role="option"
                       aria-selected={index === marked}
-                      onClick={() => choose(customer)}
+                      onClick={() => choose(party)}
                       className={`cursor-pointer px-3 py-2 text-sm wrap-anywhere ${
                         index === marked ? "bg-brand-50" : "hover:bg-slate-50"
                       }`}
                     >
-                      {customer.name}
-                      {customer.mobile && (
-                        <span className="block text-slate-500">{customer.mobile}</span>
-                      )}
+                      {party.name}
+                      {party.mobile && <span className="block text-slate-500">{party.mobile}</span>}
                     </li>
                   ))}
                 </ul>
-                <Note answer={answer} />
+                <Note type={type} answer={answer} />
               </div>
             )}
           </div>
@@ -142,7 +149,7 @@ export function CustomerPicker({
             }}
             className={`${buttonStyles.secondary} shrink-0`}
           >
-            + New<span className="sr-only"> customer</span>
+            + New<span className="sr-only"> {type}</span>
           </button>
         </>
       )}
@@ -151,14 +158,14 @@ export function CustomerPicker({
 }
 
 /** What the list cannot say by itself. */
-function Note({ answer }: { answer: Lookup<PartyList> | undefined }) {
+function Note({ type, answer }: { type: PickableType; answer: Lookup<PartyList> | undefined }) {
   const list = answer?.data;
   const note = answer?.failed
-    ? "The customers could not be searched. Check your connection and type again."
+    ? `The ${type}s could not be searched. Check your connection and type again.`
     : !list
       ? "Searching…"
       : list.total === 0
-        ? "No active customer matches."
+        ? `No active ${type} matches.`
         : list.total > list.parties.length
           ? `Showing ${list.parties.length} of ${list.total}. Type more of the name.`
           : null;

@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeading } from "@/components/page-heading";
 import { fetchGases, fetchStartDate, fetchToday, fetchVehicles, orNull } from "@/lib/api";
 import { OPENING_STOCK_PATH } from "@/lib/routes";
-import { DispatchForm, type FormChoices } from "./dispatch-form";
+import { BillForm, type FormChoices } from "./bill-form";
 
 export const metadata: Metadata = {
   title: "New bill · GasFlow",
@@ -28,7 +28,7 @@ export default async function NewBillPage() {
     <div className="space-y-6">
       <PageHeading
         title="New bill"
-        subtitle="A dispatch from the shop to a customer, copied from the paper."
+        subtitle="Cylinders going out from the shop or coming back from a refiller, copied from the paper."
       />
       {setup && !setup.startDate ? (
         <EmptyState>
@@ -39,7 +39,7 @@ export default async function NewBillPage() {
           page, before bills are entered.
         </EmptyState>
       ) : (
-        <DispatchForm choices={choices} />
+        <BillForm choices={choices} />
       )}
     </div>
   );

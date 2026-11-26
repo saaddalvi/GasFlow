@@ -1,9 +1,8 @@
 import {
   PAPER_KIND_NAMES,
+  type NewBill,
   type NewBillLine,
-  type NewDispatch,
   type NewOpeningStock,
-  type PaperKind,
   type Staff,
 } from "@gasflow/shared";
 import type { Clock } from "../clock";
@@ -67,38 +66,53 @@ export function enterOpeningStock(
   });
 }
 
+/** Who is named on each type of bill entered from paper, beside the shop. */
+const NAMED_PARTY = {
+  dispatch: { type: "customer", rule: "A dispatch goes to a customer." },
+  send_to_refiller: { type: "refiller", rule: "A send to refiller goes to a refiller." },
+  return_from_refiller: { type: "refiller", rule: "A return from refiller comes from a refiller." },
+} as const;
+
 /**
- * Records cylinders leaving the shop for a customer, and gives the new bill's id.
- * The shop may be recorded as holding fewer than are sent.
+ * Records a bill entered from paper, moving cylinders between the shop and a
+ * customer or refiller, and gives its id. Whoever the cylinders leave may be
+ * recorded as holding fewer than are moved.
  */
-export function enterDispatch(
+export function enterBill(
   db: Database,
   clock: Clock,
   staff: Staff,
-  { type, paperKind, number, date, customerId, vehicleId, notes, lines }: NewDispatch,
+  bill: NewBill,
 ): Promise<string> {
+  const { type, number, date, vehicleId, notes, lines } = bill;
+  const partyId = bill.type === "dispatch" ? bill.customerId : bill.refillerId;
+  const named = NAMED_PARTY[type];
+  // A return from a refiller is numbered by the refiller's slip, not the agency's paper.
+  const paperKind = bill.type === "return_from_refiller" ? null : bill.paperKind;
   const save = db.$transaction(async (tx) => {
     await refuseUnrecordedDate(tx, date);
-    const customer = await lockParty(tx, customerId);
-    if (customer.type !== "customer") {
-      throw new Refusal(409, `${customer.name} is not a customer. A dispatch goes to a customer.`);
+    const party = await lockParty(tx, partyId);
+    if (party.type !== named.type) {
+      throw new Refusal(409, `${party.name} is not a ${named.type}. ${named.rule}`);
     }
-    if (!customer.active) {
-      throw inactiveRefusal(customer.name);
+    if (!party.active) {
+      throw inactiveRefusal(party.name);
     }
     if (vehicleId) {
       await refuseUnusableVehicle(tx, vehicleId);
     }
     await refuseUnusableGases(tx, lines);
     const shop = await getShop(tx);
-    const bill = await tx.bill.create({
+    const [fromPartyId, toPartyId] =
+      type === "return_from_refiller" ? [partyId, shop.id] : [shop.id, partyId];
+    const saved = await tx.bill.create({
       data: {
         type,
         paperKind,
         number,
         date: toDatabaseDate(date),
-        fromPartyId: shop.id,
-        toPartyId: customerId,
+        fromPartyId,
+        toPartyId,
         vehicleId,
         notes,
         enteredById: staff.id,
@@ -107,25 +121,27 @@ export function enterDispatch(
       },
       select: { id: true },
     });
-    return bill.id;
+    return saved.id;
   });
-  return refusingTakenNumber(paperKind, number, save);
+  return refusingTakenNumber(
+    save,
+    paperKind
+      ? `${PAPER_KIND_NAMES[paperKind]} number ${number} is already in use.`
+      : `This refiller's slip number ${number} is already in use.`,
+  );
 }
 
 /**
- * The database keeps the numbers on each paper kind apart, even between saves at
- * once. A new bill and its lines can repeat nothing else.
+ * The database keeps apart the numbers on each paper kind, and each refiller's
+ * slip numbers, even between saves at once. A new bill and its lines can repeat
+ * nothing else.
  */
-async function refusingTakenNumber<T>(
-  paperKind: PaperKind,
-  number: string,
-  save: Promise<T>,
-): Promise<T> {
+async function refusingTakenNumber<T>(save: Promise<T>, refusal: string): Promise<T> {
   try {
     return await save;
   } catch (error) {
     if (isRepeat(error)) {
-      throw new Refusal(409, `${PAPER_KIND_NAMES[paperKind]} number ${number} is already in use.`);
+      throw new Refusal(409, refusal);
     }
     throw error;
   }

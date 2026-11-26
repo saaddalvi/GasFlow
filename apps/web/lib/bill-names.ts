@@ -9,6 +9,8 @@ import {
 export const BILL_TYPE_NAMES: Record<BillType, string> = {
   opening_stock: "Opening stock",
   dispatch: "Dispatch",
+  send_to_refiller: "Send to refiller",
+  return_from_refiller: "Return from refiller",
 };
 
 export const FILL_STATE_NAMES: Record<FillState, string> = {

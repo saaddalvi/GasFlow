@@ -5,6 +5,8 @@ import {
   billNumberUseSchema,
   PAPER_KIND_NAMES,
   PAPER_KINDS,
+  refillerRefillerSlipNumberUseQuerySchema,
+  type BillNumberUse,
   type PaperKind,
 } from "@gasflow/shared";
 import Link from "next/link";
@@ -12,6 +14,7 @@ import { Field, SelectField } from "@/components/fields";
 import { formatDate } from "@/lib/dates";
 import { billPath, NEW_BILL_PATH } from "@/lib/routes";
 import { useLookup } from "@/lib/use-lookup";
+import type { ChosenParty } from "./party-picker";
 
 /** The paper kind and bill number, with a warning while a number already used is typed. */
 export function BillNumberFields({
@@ -29,14 +32,7 @@ export function BillNumberFields({
   askAgain: number;
 }) {
   const query = billNumberUseQuerySchema.safeParse({ paperKind, number });
-  const answer = useLookup(
-    query.success
-      ? `${NEW_BILL_PATH}/number-use?${new URLSearchParams(query.data).toString()}`
-      : null,
-    billNumberUseSchema,
-    askAgain,
-  );
-  const usedBy = answer?.data?.usedBy;
+  const usedBy = useNumberUse("number-use", query.data, askAgain);
 
   return (
     <>
@@ -52,27 +48,94 @@ export function BillNumberFields({
           </option>
         ))}
       </SelectField>
-      <div>
-        <Field
-          label="Bill number"
-          required
-          autoComplete="off"
-          value={number}
-          aria-invalid={Boolean(usedBy)}
-          onChange={(event) => onNumber(event.target.value)}
-        />
-        <p aria-live="polite" className="mt-1 text-sm text-rose-700 empty:hidden">
-          {usedBy && (
-            <>
-              {PAPER_KIND_NAMES[paperKind]} number {query.data?.number} is already used, on a bill
-              dated {formatDate(usedBy.date)}. {/* In a new tab, so that this bill is not lost. */}
-              <Link href={billPath(usedBy.id)} target="_blank" className="underline">
-                View it<span className="sr-only"> in a new tab</span>
-              </Link>
-            </>
-          )}
-        </p>
-      </div>
+      <NumberField label="Bill number" number={number} onNumber={onNumber} usedBy={usedBy}>
+        {PAPER_KIND_NAMES[paperKind]} number {query.data?.number} is already used, on a bill
+      </NumberField>
     </>
+  );
+}
+
+/**
+ * The refiller's slip number, with a warning while one already used for that
+ * refiller is typed.
+ */
+export function RefillerSlipNumberField({
+  refiller,
+  number,
+  onNumber,
+  askAgain,
+}: {
+  /** Whose slip it is, once chosen. Until then nothing can be looked up. */
+  refiller: ChosenParty | null;
+  number: string;
+  onNumber: (number: string) => void;
+  /** Changes when the number should be looked up again. */
+  askAgain: number;
+}) {
+  const query = refillerRefillerSlipNumberUseQuerySchema.safeParse({
+    refillerId: refiller?.id,
+    number,
+  });
+  const usedBy = useNumberUse("refiller-slip-number-use", query.data, askAgain);
+
+  return (
+    <NumberField label="Refiller's slip number" number={number} onNumber={onNumber} usedBy={usedBy}>
+      {refiller?.name}&rsquo;s slip number {query.data?.number} is already used, on a return from
+      refiller
+    </NumberField>
+  );
+}
+
+/** The posted bill that has the number asked about, if the answer is in and there is one. */
+function useNumberUse(
+  question: "number-use" | "refiller-slip-number-use",
+  query: Record<string, string> | undefined,
+  askAgain: number,
+) {
+  const answer = useLookup(
+    query ? `${NEW_BILL_PATH}/${question}?${new URLSearchParams(query).toString()}` : null,
+    billNumberUseSchema,
+    askAgain,
+  );
+  return answer?.data?.usedBy;
+}
+
+/** A box for a bill's number, warning of the bill that already has it. */
+function NumberField({
+  label,
+  number,
+  onNumber,
+  usedBy,
+  children,
+}: {
+  label: string;
+  number: string;
+  onNumber: (number: string) => void;
+  usedBy: BillNumberUse["usedBy"] | undefined;
+  /** The start of the warning, which goes on to give the bill's date. */
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <Field
+        label={label}
+        required
+        autoComplete="off"
+        value={number}
+        aria-invalid={Boolean(usedBy)}
+        onChange={(event) => onNumber(event.target.value)}
+      />
+      <p aria-live="polite" className="mt-1 text-sm text-rose-700 empty:hidden">
+        {usedBy && (
+          <>
+            {children} dated {formatDate(usedBy.date)}.{" "}
+            {/* In a new tab, so that this bill is not lost. */}
+            <Link href={billPath(usedBy.id)} target="_blank" className="underline">
+              View it<span className="sr-only"> in a new tab</span>
+            </Link>
+          </>
+        )}
+      </p>
+    </div>
   );
 }

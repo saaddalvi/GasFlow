@@ -85,6 +85,8 @@ model Vehicle {
 enum BillType {
   opening_stock
   dispatch
+  send_to_refiller
+  return_from_refiller
 
   @@map("bill_type")
 }
@@ -117,7 +119,7 @@ enum PaperKind {
 model Bill {
   id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   type        BillType
-  /// Case-insensitive, so that no two paper numbers differ only in capitals.
+  /// Case-insensitive, so that no two typed numbers differ only in capitals.
   number      String     @db.Citext
   /// Set on bills numbered from the agency's own paper, and only on those.
   paperKind   PaperKind? @map("paper_kind")
@@ -142,6 +144,9 @@ model Bill {
   // No two bills on one paper kind share a number, in any year. A cancelled one
   // frees its number.
   @@unique([paperKind, number], map: "bills_one_number_per_paper_kind", where: raw("status = 'posted'"))
+  // A return from a refiller is numbered by the refiller's slip, whose number no
+  // other posted return from that refiller may have.
+  @@unique([fromPartyId, number], map: "bills_one_slip_number_per_refiller", where: raw("type = 'return_from_refiller' AND status = 'posted'"))
   @@index([date, enteredAt])
   @@index([fromPartyId])
   @@index([toPartyId])

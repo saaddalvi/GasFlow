@@ -121,12 +121,55 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     };
   }
 
-  /** Saves a dispatch bill, expecting it to be saved. */
-  async function dispatch(customerId: string, change?: object) {
-    const response = await postBill(dispatchFor(customerId, change));
+  /** Saves a bill, expecting it to be saved. */
+  async function save(payload: object) {
+    const response = await postBill(payload);
     expect(response.statusCode).toBe(201);
     return billSchema.parse(response.json());
   }
+
+  /** Saves a dispatch bill, expecting it to be saved. */
+  const dispatch = (customerId: string, change?: object) => save(dispatchFor(customerId, change));
+
+  /**
+   * What the new bill form sends for a send to refiller, with a fresh bill number.
+   * A test changes whatever matters to it.
+   */
+  function sendFor(refillerId: string, change: object = {}) {
+    billsNumbered += 1;
+    return {
+      type: "send_to_refiller",
+      paperKind: "bill",
+      number: String(1000 + billsNumbered),
+      date: "2026-11-26",
+      refillerId,
+      lines: asLines([{ gas: "Medical oxygen", fillState: "empty", quantity: 5 }]),
+      ...change,
+    };
+  }
+
+  /** Saves a send to refiller, expecting it to be saved. */
+  const send = (refillerId: string, change?: object) => save(sendFor(refillerId, change));
+
+  /**
+   * What the new bill form sends for a return from refiller, with a fresh slip
+   * number. A test changes whatever matters to it.
+   */
+  function refillerReturnFor(refillerId: string, change: object = {}) {
+    billsNumbered += 1;
+    return {
+      type: "return_from_refiller",
+      number: String(1000 + billsNumbered),
+      date: "2026-11-26",
+      refillerId,
+      lines: asLines([{ gas: "Medical oxygen", fillState: "filled", quantity: 5 }]),
+      ...change,
+    };
+  }
+
+  /** Saves a return from refiller, expecting it to be saved. */
+  const refillerReturn = (refillerId: string, change?: object) =>
+    save(refillerReturnFor(refillerId, change));
 
   /** The stock report staff see for a query such as "date=2026-11-01". */
   async function report(query = "") {
@@ -168,6 +211,10 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     postBill,
     dispatchFor,
     dispatch,
+    sendFor,
+    send,
+    refillerReturnFor,
+    refillerReturn,
     report,
     figures,
     bills,

@@ -29,6 +29,7 @@ import {
   type PartyList,
   type PartyListQuery,
   type Shop,
+  type RefillerSlipNumberUseQuery,
   type Staff,
   type StaffList,
   type StartDate,
@@ -71,6 +72,15 @@ export async function fetchBills({ page }: BillListQuery): Promise<BillList> {
 export async function fetchNumberUse(query: BillNumberUseQuery): Promise<BillNumberUse> {
   return billNumberUseSchema.parse(
     await getJson(`/api/bills/number-use?${new URLSearchParams(query).toString()}`),
+  );
+}
+
+/** Which return from the refiller, if any, already has this slip number. */
+export async function fetchRefillerSlipNumberUse(
+  query: RefillerSlipNumberUseQuery,
+): Promise<BillNumberUse> {
+  return billNumberUseSchema.parse(
+    await getJson(`/api/bills/refiller-slip-number-use?${new URLSearchParams(query).toString()}`),
   );
 }
 

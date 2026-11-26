@@ -10,7 +10,8 @@ export interface FormLine {
   /** Stays with the line when others are removed. */
   key: number;
   gasId: string;
-  fillState: FillState;
+  /** Left out until one is chosen, so that the line takes the bill's usual one. */
+  fillState?: FillState;
   quantity: string;
   /**
    * Set on a line the form filled in by itself, which may be left as it is and is
@@ -20,7 +21,7 @@ export interface FormLine {
 }
 
 export function blankLine(key: number): FormLine {
-  return { key, gasId: "", fillState: "filled", quantity: "" };
+  return { key, gasId: "", quantity: "" };
 }
 
 /** A key that none of these lines has. */
@@ -29,10 +30,14 @@ export function nextKey(lines: FormLine[]): number {
 }
 
 /** The lines the bill is to have, as a request carries them, yet to be checked. */
-export function asNewLines(lines: FormLine[]) {
+export function asNewLines(lines: FormLine[], defaultFillState: FillState) {
   return lines
     .filter((line) => !line.optional)
-    .map(({ gasId, fillState, quantity }) => ({ gasId, fillState, quantity: Number(quantity) }));
+    .map(({ gasId, fillState = defaultFillState, quantity }) => ({
+      gasId,
+      fillState,
+      quantity: Number(quantity),
+    }));
 }
 
 /** The lines on a form, with the ways to change, remove and add them. */
@@ -40,11 +45,14 @@ export function LineList({
   lines,
   onChange,
   gases,
+  defaultFillState,
   children,
 }: {
   lines: FormLine[];
   onChange: (lines: FormLine[]) => void;
   gases: Gas[];
+  /** What a line shows until a fill state is chosen for it. */
+  defaultFillState: FillState;
   /** Further buttons, beside the one that adds a line. */
   children?: React.ReactNode;
 }) {
@@ -57,6 +65,7 @@ export function LineList({
               line={line}
               position={index + 1}
               gases={gases}
+              defaultFillState={defaultFillState}
               onChange={(changed) =>
                 onChange(
                   lines.map((other) =>
@@ -92,6 +101,7 @@ function LineFields({
   line,
   position,
   gases,
+  defaultFillState,
   onChange,
   onRemove,
 }: {
@@ -99,6 +109,7 @@ function LineFields({
   /** The line's place on the form, counted from 1. */
   position: number;
   gases: Gas[];
+  defaultFillState: FillState;
   onChange: (line: FormLine) => void;
   /** Left out when the line cannot be removed. */
   onRemove?: () => void;
@@ -126,7 +137,7 @@ function LineFields({
       <div className="min-w-0">
         <SelectField
           label="Fill state"
-          value={line.fillState}
+          value={line.fillState ?? defaultFillState}
           onChange={(event) => onChange({ ...line, fillState: event.target.value as FillState })}
         >
           {FILL_STATES.map((fillState) => (

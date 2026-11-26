@@ -4,9 +4,11 @@ import {
   type BillListQuery,
   type BillNumberUseQuery,
   type OpeningStockListQuery,
+  type RefillerSlipNumberUseQuery,
 } from "@gasflow/shared";
 import type { Database } from "../database";
 import { fromDatabaseDate } from "../database-date";
+import type { Prisma } from "../generated/prisma/client";
 import { Refusal } from "../refusal";
 
 // Reading bills. Only the ledger changes them.
@@ -53,9 +55,22 @@ export async function listBills(db: Database, { page }: BillListQuery) {
 }
 
 /** The posted bill that has this number on this paper kind, if there is one. */
-export async function findNumberUse(db: Database, { paperKind, number }: BillNumberUseQuery) {
+export function findNumberUse(db: Database, { paperKind, number }: BillNumberUseQuery) {
+  return findUse(db, { paperKind, number });
+}
+
+/** The posted return from this refiller that has this number of theirs, if there is one. */
+export function findRefillerSlipNumberUse(
+  db: Database,
+  { refillerId, number }: RefillerSlipNumberUseQuery,
+) {
+  return findUse(db, { type: "return_from_refiller", fromPartyId: refillerId, number });
+}
+
+/** The posted bill that matches, as the form is told of one that has a number. */
+async function findUse(db: Database, where: Prisma.BillWhereInput) {
   const bill = await db.bill.findFirst({
-    where: { paperKind, number, status: "posted" },
+    where: { ...where, status: "posted" },
     select: { id: true, date: true },
   });
   return { usedBy: bill && { id: bill.id, date: fromDatabaseDate(bill.date) } };

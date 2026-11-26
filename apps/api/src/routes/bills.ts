@@ -4,16 +4,23 @@ import {
   billNumberUseQuerySchema,
   billNumberUseSchema,
   billSchema,
-  newDispatchSchema,
+  newBillSchema,
+  refillerRefillerSlipNumberUseQuerySchema,
 } from "@gasflow/shared";
 import type { FastifyInstance } from "fastify";
 import type { AppDependencies } from "../app";
 import { parseRequest } from "../refusal";
-import { findNumberUse, getBill, listBills, noSuchBill } from "../services/bills";
-import { enterDispatch } from "../services/ledger";
+import {
+  findNumberUse,
+  findRefillerSlipNumberUse,
+  getBill,
+  listBills,
+  noSuchBill,
+} from "../services/bills";
+import { enterBill } from "../services/ledger";
 import { idParam } from "./id-param";
 
-/** Every staff member reads bills and enters those copied from the agency's paper. */
+/** Every staff member reads bills and enters those copied from paper. */
 export function billRoutes(app: FastifyInstance, { db, clock }: AppDependencies): void {
   app.get("/api/bills", async (request) => {
     const query = parseRequest(billListQuerySchema, request.query);
@@ -25,9 +32,14 @@ export function billRoutes(app: FastifyInstance, { db, clock }: AppDependencies)
     return billNumberUseSchema.parse(await findNumberUse(db, query));
   });
 
+  app.get("/api/bills/refiller-slip-number-use", async (request) => {
+    const query = parseRequest(refillerRefillerSlipNumberUseQuerySchema, request.query);
+    return billNumberUseSchema.parse(await findRefillerSlipNumberUse(db, query));
+  });
+
   app.post("/api/bills", async (request, reply) => {
-    const dispatch = parseRequest(newDispatchSchema, request.body);
-    const billId = await enterDispatch(db, clock, request.staff, dispatch);
+    const bill = parseRequest(newBillSchema, request.body);
+    const billId = await enterBill(db, clock, request.staff, bill);
     reply.code(201);
     return billSchema.parse(await getBill(db, billId));
   });

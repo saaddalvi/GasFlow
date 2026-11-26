@@ -18,7 +18,7 @@ export function OpeningStockForm({ parties, gases }: { parties: BillParty[]; gas
   async function submit(form: FormData): Promise<Outcome> {
     const { data, problem } = checkInput(newOpeningStockSchema, {
       partyId: form.get("partyId"),
-      lines: asNewLines(lines),
+      lines: asNewLines(lines, "filled"),
     });
     return data ? addOpeningStock(data) : { error: problem };
   }
@@ -43,7 +43,7 @@ export function OpeningStockForm({ parties, gases }: { parties: BillParty[]; gas
           ))}
         </SelectField>
       </div>
-      <LineList lines={lines} onChange={setLines} gases={gases} />
+      <LineList lines={lines} onChange={setLines} gases={gases} defaultFillState="filled" />
     </ActionForm>
   );
 }

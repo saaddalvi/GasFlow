@@ -137,7 +137,8 @@ In the API:
   `src/identity.ts`; the real one is `src/clerk-identity.ts`.
 - Only the bill ledger, `src/services/ledger.ts`, changes bills. Each of its
   operations checks the rules and writes in one transaction. The database keeps
-  bill numbers unique on each paper kind, ignoring cancelled bills.
+  bill numbers unique on each paper kind, and a refiller's slip numbers unique
+  for that refiller, ignoring cancelled bills.
 - Reports only read. They work every figure out from posted bills, and no stock
   count is stored.
 - A calendar date is text such as `2026-11-26`; `src/database-date.ts` converts

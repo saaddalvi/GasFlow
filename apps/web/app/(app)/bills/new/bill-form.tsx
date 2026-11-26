@@ -3,8 +3,10 @@
 import {
   checkInput,
   FILL_STATES,
-  newDispatchSchema,
+  newBillSchema,
+  type FillState,
   type Gas,
+  type NewBill,
   type PaperKind,
   type Vehicle,
 } from "@gasflow/shared";
@@ -17,14 +19,14 @@ import { Field, SelectField, TextAreaField } from "@/components/fields";
 import { asNewLines, blankLine, LineList, nextKey, type FormLine } from "@/components/line-fields";
 import { LoadError } from "@/components/load-error";
 import type { Outcome } from "@/lib/api";
-import { FILL_STATE_NAMES } from "@/lib/bill-names";
+import { BILL_TYPE_NAMES, FILL_STATE_NAMES } from "@/lib/bill-names";
 import { formatDate, formatDateInFull } from "@/lib/dates";
 import { BILLS_PATH } from "@/lib/routes";
 import { vehicleName } from "@/lib/vehicle-names";
 import { saveBill } from "./actions";
-import { BillNumberFields } from "./bill-number-fields";
-import { CustomerPicker, type ChosenCustomer } from "./customer-picker";
-import { NewCustomerDialog } from "./new-customer-dialog";
+import { BillNumberFields, RefillerSlipNumberField } from "./bill-number-fields";
+import { NewPartyDialog } from "./new-party-dialog";
+import { PartyPicker, type ChosenParty, type PickableType } from "./party-picker";
 
 /** What the form offers, and the dates it starts from. */
 export interface FormChoices {
@@ -34,7 +36,14 @@ export interface FormChoices {
   vehicles: Vehicle[];
 }
 
-export function DispatchForm({ choices }: { choices: FormChoices | null }) {
+/** How the form differs from one type of bill to another. */
+const BILL_FORMS: Record<NewBill["type"], { partyType: PickableType; fillState: FillState }> = {
+  dispatch: { partyType: "customer", fillState: "filled" },
+  send_to_refiller: { partyType: "refiller", fillState: "empty" },
+  return_from_refiller: { partyType: "refiller", fillState: "filled" },
+};
+
+export function BillForm({ choices }: { choices: FormChoices | null }) {
   // The page loads again after a refusal. Should that fail, the form keeps what it
   // had, so that a bill being entered is not lost.
   const [held, setHeld] = useState(choices);
@@ -52,26 +61,35 @@ export function DispatchForm({ choices }: { choices: FormChoices | null }) {
 
 function Form({ choices: { startDate, today, gases, vehicles } }: { choices: FormChoices }) {
   const router = useRouter();
+  const [type, setType] = useState<NewBill["type"]>("dispatch");
   const [paperKind, setPaperKind] = useState<PaperKind>("bill");
-  const [number, setNumber] = useState("");
+  // Kept apart, so that a number copied from one paper is not saved as the other's.
+  const [paperNumber, setPaperNumber] = useState("");
+  const [refillerSlipNumber, setRefillerSlipNumber] = useState("");
   const [date, setDate] = useState(today);
-  const [customer, setCustomer] = useState<ChosenCustomer | null>(null);
+  // One of each type is remembered, in case the type is changed and changed back.
+  const [chosen, setChosen] = useState<Partial<Record<PickableType, ChosenParty | null>>>({});
   const [newName, setNewName] = useState("");
   const [lines, setLines] = useState(() => [blankLine(1)]);
   // How many saves have been turned down, each of which may mean the number is taken.
   const [refusals, setRefusals] = useState(0);
-  const newCustomer = useRef<ActionDialogHandle>(null);
+  const newParty = useRef<ActionDialogHandle>(null);
+  const { partyType, fillState: defaultFillState } = BILL_FORMS[type];
+  const party = chosen[partyType] ?? null;
+  const choose = (party: ChosenParty | null) =>
+    setChosen((chosen) => ({ ...chosen, [partyType]: party }));
 
   async function submit(form: FormData): Promise<Outcome> {
-    const { data, problem } = checkInput(newDispatchSchema, {
-      type: "dispatch",
+    const { data, problem } = checkInput(newBillSchema, {
+      type,
+      // Not part of a return from refiller, which the check leaves out.
       paperKind,
-      number,
+      number: type === "return_from_refiller" ? refillerSlipNumber : paperNumber,
       date,
-      customerId: customer?.id ?? "",
+      [`${partyType}Id`]: party?.id ?? "",
       vehicleId: form.get("vehicleId") || null,
       notes: form.get("notes"),
-      lines: asNewLines(lines),
+      lines: asNewLines(lines, defaultFillState),
     });
     const outcome = data ? await saveBill(data) : { error: problem };
     if (outcome.error) setRefusals((count) => count + 1);
@@ -106,13 +124,34 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
           onCancel={() => router.push(BILLS_PATH)}
         >
           <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-            <BillNumberFields
-              paperKind={paperKind}
-              number={number}
-              onPaperKind={setPaperKind}
-              onNumber={setNumber}
-              askAgain={refusals}
-            />
+            <SelectField
+              label="Type"
+              required
+              value={type}
+              onChange={(event) => setType(event.target.value as NewBill["type"])}
+            >
+              {Object.keys(BILL_FORMS).map((option) => (
+                <option key={option} value={option}>
+                  {BILL_TYPE_NAMES[option as NewBill["type"]]}
+                </option>
+              ))}
+            </SelectField>
+            {type === "return_from_refiller" ? (
+              <RefillerSlipNumberField
+                refiller={party}
+                number={refillerSlipNumber}
+                onNumber={setRefillerSlipNumber}
+                askAgain={refusals}
+              />
+            ) : (
+              <BillNumberFields
+                paperKind={paperKind}
+                number={paperNumber}
+                onPaperKind={setPaperKind}
+                onNumber={setPaperNumber}
+                askAgain={refusals}
+              />
+            )}
             <div>
               <Field
                 label="Date"
@@ -128,12 +167,14 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
                 {date && formatDateInFull(date)}
               </p>
             </div>
-            <CustomerPicker
-              chosen={customer}
-              onChoose={setCustomer}
+            <PartyPicker
+              key={partyType}
+              type={partyType}
+              chosen={party}
+              onChoose={choose}
               onNew={(typed) => {
                 setNewName(typed);
-                newCustomer.current?.open();
+                newParty.current?.open();
               }}
             />
             <SelectField label="Vehicle" name="vehicleId" defaultValue="">
@@ -155,34 +196,42 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
                 Leave the quantity blank for a gas that is not on the paper.
               </p>
             )}
-            <LineList lines={lines} onChange={setLines} gases={gases}>
+            <LineList
+              lines={lines}
+              onChange={setLines}
+              gases={gases}
+              defaultFillState={defaultFillState}
+            >
               <button type="button" onClick={addEveryGas} className={buttonStyles.secondary}>
                 + One line per gas
               </button>
             </LineList>
-            <Totals lines={lines} />
+            <Totals lines={lines} defaultFillState={defaultFillState} />
           </fieldset>
         </ActionForm>
       </section>
       {/* Outside the bill's form, since one form cannot sit inside another. */}
-      <NewCustomerDialog ref={newCustomer} name={newName} onAdded={setCustomer} />
+      <NewPartyDialog ref={newParty} type={partyType} name={newName} onAdded={choose} />
     </div>
   );
 }
 
 /** The cylinders on the lines so far, to check against the paper. */
-function Totals({ lines }: { lines: FormLine[] }) {
+function Totals({ lines, defaultFillState }: { lines: FormLine[]; defaultFillState: FillState }) {
   // A quantity counts once it is one the bill could be saved with.
   const counted = lines.map((line) => {
     const quantity = Number(line.quantity);
-    return { ...line, quantity: Number.isInteger(quantity) && quantity > 0 ? quantity : 0 };
+    return {
+      fillState: line.fillState ?? defaultFillState,
+      quantity: Number.isInteger(quantity) && quantity > 0 ? quantity : 0,
+    };
   });
   const sum = (of: typeof counted) => of.reduce((total, line) => total + line.quantity, 0);
   const totals = [
     ...FILL_STATES.map((fillState) => ({
       label: FILL_STATE_NAMES[fillState],
       count: sum(counted.filter((line) => line.fillState === fillState)),
-      // Defective cylinders seldom leave the shop, so are shown only when some do.
+      // Defective cylinders are seldom on a bill, so are counted only when some are.
       hiddenAtNone: fillState === "defective",
     })),
     { label: "Total", count: sum(counted), hiddenAtNone: false },
