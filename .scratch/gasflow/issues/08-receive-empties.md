@@ -8,21 +8,21 @@ Excess cylinders are refused in this ticket; unmatched returns arrive in ticket 
 
 **Status:** ready-for-agent
 
-- [ ] The customer picker is focused on load, searchable, and shows each customer's total pending
-- [ ] Pending cylinders are listed oldest first, one row per bill and gas, with sent, returned, pending and days out; a bill with several lines of one gas shows one row
-- [ ] The customer's opening stock appears as "Opening stock" and takes returns like a dispatch bill
-- [ ] Closed rows are hidden behind a "Show closed bills" link
-- [ ] Each row takes a quantity, has an "All" button, and has a fill state that defaults to Empty
-- [ ] The date defaults to today and can be changed; only bills dated on or before it are offered, and the API refuses any other allocation
-- [ ] A date before the start date is refused
-- [ ] An optional slip number can be noted, with no uniqueness rule
-- [ ] One save creates one return, numbered automatically such as `RET-20261126-001`, with allocations across bills, posted at once
-- [ ] More than a row's pending quantity is refused and nothing is saved
-- [ ] Two saves against the same pending cylinders at the same moment, on separate database connections, never over-return a bill
-- [ ] A confirmation names the customer, quantity and bill numbers
-- [ ] The dispatch bill page shows sent, returned and pending, an Open, Partly returned or Closed tag, and each return with date, quantity, return number and who entered it
-- [ ] The customer's holding equals pending, and the shop's counts rise in the chosen fill states
-- [ ] Receive empties is reachable from the navigation and usable on a phone
+- [x] The customer picker is focused on load, searchable, and shows each customer's total pending
+- [x] Pending cylinders are listed oldest first, one row per bill and gas, with sent, returned, pending and days out; a bill with several lines of one gas shows one row
+- [x] The customer's opening stock appears as "Opening stock" and takes returns like a dispatch bill
+- [x] Closed rows are hidden behind a "Show closed bills" link
+- [x] Each row takes a quantity, has an "All" button, and has a fill state that defaults to Empty
+- [x] The date defaults to today and can be changed; only bills dated on or before it are offered, and the API refuses any other allocation
+- [x] A date before the start date is refused
+- [x] An optional slip number can be noted, with no uniqueness rule
+- [x] One save creates one return, numbered automatically such as `RET-20261126-001`, with allocations across bills, posted at once
+- [x] More than a row's pending quantity is refused and nothing is saved
+- [x] Two saves against the same pending cylinders at the same moment, on separate database connections, never over-return a bill
+- [x] A confirmation names the customer, quantity and bill numbers
+- [x] The dispatch bill page shows sent, returned and pending, an Open, Partly returned or Closed tag, and each return with date, quantity, return number and who entered it
+- [x] The customer's holding equals pending, and the shop's counts rise in the chosen fill states
+- [x] Receive empties is reachable from the navigation and usable on a phone
 
 ## Comments
 
@@ -83,3 +83,10 @@ Found during the checks and fixed afterwards. The fixes were checked in the same
 - At 320 wide, the table under **Returns** on a bill page was wider than its box, so **Pending** was out of view until the table was swiped. Below 640 wide it now has smaller headings and less padding. It fits at 320 with the longest gas name and four-digit counts.
 - In the list of returns on that page, each "returned" total sat at a different horizontal position on a narrow phone. They now line up at the right edge.
 - After a refused save, the message stayed while the browser's own check blocked the next try. It now goes. This is in `ActionForm`, so it applies to every screen that uses it. A message still stays while fields are being changed, until the next try, as noted in ticket 07.
+
+**26 November 2026: completed** in commits `a56277d` and `e6c0d8b`. Both are pushed; the CI result has not been checked.
+
+- The project owner asked for the ticket to be marked completed. No results of a check on a real phone are recorded here. The last box is ticked on the strength of the emulated phone described above.
+- Lint, type checks and 357 tests pass on `4cbbb9b`, the head of `main` when the ticket was marked completed.
+- Both new migrations have been applied to the development database.
+- The decisions listed for the project owner are not recorded as settled.
