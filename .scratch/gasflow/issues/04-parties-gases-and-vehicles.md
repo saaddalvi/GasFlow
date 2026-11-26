@@ -6,13 +6,13 @@
 
 **Status:** ready-for-agent
 
-- [ ] Staff can add, view and edit a customer, refiller or supplier with name (required), abbreviation (derived from the name if left blank), mobile, contact person, address, notes and active flag
-- [ ] The shop cannot be added, deactivated or deleted, and warehouse is not a party type
-- [ ] The party list can be searched by name, filtered by type, and shows inactive parties on request
-- [ ] A party can be deactivated and then no longer appears in pickers (the block for parties with open matters comes in ticket 17)
-- [ ] Staff can add and edit vehicles with plate, label and active flag
-- [ ] Admins can add, rename and retire gases; retired gases are no longer offered on new entries; staff cannot change gases
-- [ ] The forms and the API validate with the same shared schemas
+- [x] Staff can add, view and edit a customer, refiller or supplier with name (required), abbreviation (derived from the name if left blank), mobile, contact person, address, notes and active flag
+- [x] The shop cannot be added, deactivated or deleted, and warehouse is not a party type
+- [x] The party list can be searched by name, filtered by type, and shows inactive parties on request
+- [x] A party can be deactivated and then no longer appears in pickers (the block for parties with open matters comes in ticket 17)
+- [x] Staff can add and edit vehicles with plate, label and active flag
+- [x] Admins can add, rename and retire gases; retired gases are no longer offered on new entries; staff cannot change gases
+- [x] The forms and the API validate with the same shared schemas
 
 ## Comments
 
@@ -61,3 +61,8 @@ Still to do:
 
 - Sign in as a staff member who is not an admin. Check that they can add and edit parties and vehicles, that the Gases page offers no changes and that there is no Staff screen.
 - Check by hand in the browsers and on the phones the agency will use. Safari, Firefox, a real phone and a production build have not been tried.
+
+**26 November 2026: completed** in commit `4166252`. It is pushed, and [CI passed](https://github.com/saaddalvi/GasFlow/actions/runs/45782307416) at `e7d3fd8`.
+
+- The project owner asked for every criterion to be ticked and the ticket to be marked completed. No results of the checks under the last "Still to do" were recorded here.
+- The decisions listed for the project owner are not recorded as settled.
