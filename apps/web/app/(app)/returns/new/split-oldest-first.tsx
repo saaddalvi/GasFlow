@@ -4,6 +4,7 @@ import { checkInput, splitQuerySchema, type Split, type PendingList } from "@gas
 import { useState } from "react";
 import { buttonStyles } from "@/components/button-styles";
 import { Field, SelectField } from "@/components/fields";
+import type { FormLine } from "@/components/line-fields";
 import type { Lookup } from "@/lib/use-lookup";
 
 /** The total of one gas that staff asked to have spread over the oldest bills. */
@@ -24,13 +25,14 @@ export function FillOldestFirst({
   asked,
   answer,
   onFill,
+  ...excess
 }: {
   rows: PendingList["rows"];
   customerName: string;
   asked: AskedSplit | null;
   answer: Lookup<Split> | undefined;
   onFill: (gas: AskedSplit["gas"], total: number) => void;
-}) {
+} & ExcessProps) {
   const gases = [...new Map(rows.map(({ gas }) => [gas.id, gas])).values()];
   const [chosen, setChosen] = useState("");
   const [typed, setTyped] = useState("");
@@ -87,7 +89,55 @@ export function FillOldestFirst({
       <p aria-live="polite" className="text-sm empty:hidden">
         {asked && <Outcome asked={asked} answer={answer} customerName={customerName} />}
       </p>
+      {asked && answer?.data && answer.data.excess > 0 && (
+        <Excess gas={asked.gas} count={answer.data.excess} {...excess} />
+      )}
     </div>
+  );
+}
+
+/** What is needed to leave unmatched what a fill could not place. */
+interface ExcessProps {
+  /** The rows under unmatched cylinders. */
+  unmatched: FormLine[];
+  canLeaveUnmatched: (gasId: string) => boolean;
+  onLeaveUnmatched: (gasId: string, quantity: number) => void;
+}
+
+/** The way to keep the cylinders a fill left over, which are saved only if kept. */
+function Excess({
+  gas,
+  count,
+  unmatched,
+  canLeaveUnmatched,
+  onLeaveUnmatched,
+}: ExcessProps & { gas: AskedSplit["gas"]; count: number }) {
+  const kept = unmatched
+    .filter((line) => line.gasId === gas.id)
+    .reduce((total, line) => total + Number(line.quantity), 0);
+  if (!canLeaveUnmatched(gas.id)) {
+    return (
+      <p className="text-sm text-amber-800">
+        {gas.name} is retired, so none can be saved as unmatched until an admin brings it back.
+      </p>
+    );
+  }
+  return (
+    <p aria-live="polite" className="text-sm">
+      {kept === count ? (
+        <span className="text-slate-600">
+          {countOf(count)} of {gas.name} {count === 1 ? "is" : "are"} under Unmatched cylinders.
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onLeaveUnmatched(gas.id, count)}
+          className={buttonStyles.secondary}
+        >
+          Add {count} {gas.name} as unmatched
+        </button>
+      )}
+    </p>
   );
 }
 
@@ -125,7 +175,7 @@ function Outcome({
     <span className="text-amber-800">
       {rows.length === 0
         ? `None of the ${countOf(total)} of ${gas.name} were filled: ${customerName} has none pending on this date.`
-        : `Filled ${total - excess} of ${total} ${gas.name}. The other ${excess} are more than ${customerName} has pending on this date, and are not in the rows.`}
+        : `Filled ${total - excess} of ${total} ${gas.name}. The other ${excess} are more than ${customerName} has pending on this date, and are not in the rows above.`}
     </span>
   );
 }

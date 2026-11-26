@@ -22,23 +22,45 @@ export const newAllocationSchema = z.object(
 
 export type NewAllocation = z.infer<typeof newAllocationSchema>;
 
+/**
+ * Cylinders coming back that are in excess of everything pending, and so are
+ * matched to no bill yet.
+ */
+export const newUnmatchedSchema = z.object(
+  {
+    gasId: z.uuid("Choose a gas on each unmatched row.").toLowerCase(),
+    quantity: quantitySchema,
+    fillState: fillStateSchema.default("empty"),
+  },
+  "Fill in each unmatched row.",
+);
+
+export type NewUnmatched = z.infer<typeof newUnmatchedSchema>;
+
 const NOTHING_RETURNED = "Enter how many cylinders came back on at least one row.";
 const MOST_ROWS = 1000;
 
+/** The rows of one sort that a return may have, which may be none. */
+const returnRows = <Row extends z.ZodType>(row: Row) =>
+  z.array(row, NOTHING_RETURNED).max(MOST_ROWS, `Use at most ${MOST_ROWS} rows.`).default([]);
+
 /** A return as it is entered. The cylinders always come back to the shop. */
-export const newReturnSchema = z.object({
-  customerId: z.uuid("Choose a customer.").toLowerCase(),
-  date: z.iso.date("Choose the return date."),
-  /** The paper return slip's number, which need not be unique. */
-  slipNumber: optionalText({
-    max: 30,
-    tooLong: "Use a slip number of at most 30 characters.",
-  }).default(null),
-  allocations: z
-    .array(newAllocationSchema, NOTHING_RETURNED)
-    .min(1, NOTHING_RETURNED)
-    .max(MOST_ROWS, `Use at most ${MOST_ROWS} rows.`),
-});
+export const newReturnSchema = z
+  .object({
+    customerId: z.uuid("Choose a customer.").toLowerCase(),
+    date: z.iso.date("Choose the return date."),
+    /** The paper return slip's number, which need not be unique. */
+    slipNumber: optionalText({
+      max: 30,
+      tooLong: "Use a slip number of at most 30 characters.",
+    }).default(null),
+    allocations: returnRows(newAllocationSchema),
+    unmatched: returnRows(newUnmatchedSchema),
+  })
+  .refine(
+    ({ allocations, unmatched }) => allocations.length + unmatched.length > 0,
+    NOTHING_RETURNED,
+  );
 
 export type NewReturn = z.infer<typeof newReturnSchema>;
 
@@ -49,6 +71,8 @@ export const receivedReturnSchema = z.object({
   customer: billPartySchema.pick({ id: true, name: true }),
   /** Cylinders on all the rows together. */
   quantity: z.int().positive(),
+  /** How many of them were saved as unmatched. */
+  unmatched: z.int().nonnegative(),
   /** The bills the cylinders were returned against, the oldest first. */
   bills: z.array(billSchema.pick({ id: true, paperKind: true, number: true })),
 });
@@ -149,3 +173,49 @@ export const splitSchema = z.object({
 });
 
 export type Split = z.infer<typeof splitSchema>;
+
+/** Asks for the unmatched returns, a page at a time. */
+export const unmatchedListQuerySchema = z.object({ page: queryPage });
+
+export type UnmatchedListQuery = z.infer<typeof unmatchedListQuerySchema>;
+
+/** The unmatched cylinders of one gas on one return. */
+export const unmatchedRowSchema = z.object({
+  return: billSchema.pick({ id: true, number: true, date: true }),
+  customer: billPartySchema.pick({ id: true, name: true }),
+  gas: gasSchema.pick({ id: true, name: true }),
+  quantity: z.int().positive(),
+});
+
+export type UnmatchedRow = z.infer<typeof unmatchedRowSchema>;
+
+/** One page of the unmatched cylinders, the oldest return first. */
+export const unmatchedListSchema = z.object({
+  rows: z.array(unmatchedRowSchema),
+  /** How many such rows there are, on every page together. */
+  total: z.int().nonnegative(),
+  page: z.int().positive(),
+  pageSize: z.int().positive(),
+});
+
+export type UnmatchedList = z.infer<typeof unmatchedListSchema>;
+
+/**
+ * Unmatched cylinders of one gas to be matched to a dispatch bill or opening
+ * stock. Which return they are on is said beside this.
+ */
+export const newMatchSchema = z.object({
+  billId: z.uuid("Choose a bill to match to.").toLowerCase(),
+  gasId: z.uuid("Choose a gas to match.").toLowerCase(),
+  quantity: quantitySchema,
+});
+
+export type NewMatch = z.infer<typeof newMatchSchema>;
+
+/** What a match leaves. */
+export const matchedSchema = z.object({
+  /** How many cylinders of the gas the return still has unmatched. */
+  unmatched: z.int().nonnegative(),
+});
+
+export type Matched = z.infer<typeof matchedSchema>;

@@ -168,7 +168,8 @@ model BillLine {
   quantity  Int
   bill      Bill         @relation(fields: [billId], references: [id])
   gas       Gas          @relation(fields: [gasId], references: [id])
-  /// On a return, what its quantity is matched to.
+  /// On a return, what its quantity is matched to. Any of the quantity that none
+  /// of these covers is unmatched.
   clears    Allocation[] @relation("clearing_line")
   /// On a dispatch bill or opening stock, what has been matched to it.
   clearedBy Allocation[] @relation("cleared_line")

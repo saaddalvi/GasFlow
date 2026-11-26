@@ -9,6 +9,7 @@ import {
   pendingListSchema,
   type Split,
   type FillState,
+  type Gas,
   type PendingList,
   type ReceivedReturn,
 } from "@gasflow/shared";
@@ -18,25 +19,28 @@ import { ActionForm } from "@/components/action-form";
 import { BillDateField } from "@/components/bill-date-field";
 import { buttonStyles } from "@/components/button-styles";
 import { Field, SelectField } from "@/components/fields";
+import { asNewLines, blankLine, LineList, nextKey, type FormLine } from "@/components/line-fields";
 import { LoadError } from "@/components/load-error";
+import { LoadState } from "@/components/load-state";
 import type { Choice } from "@/components/search-picker";
 import type { Outcome } from "@/lib/api";
 import { FILL_STATE_NAMES } from "@/lib/bill-names";
 import { holdEnter } from "@/lib/hold-enter";
-import { billPath, RECEIVE_EMPTIES_PATH } from "@/lib/routes";
+import { billPath, RECEIVE_EMPTIES_PATH, UNMATCHED_RETURNS_PATH } from "@/lib/routes";
 import { useLastGiven } from "@/lib/use-last-given";
 import { useLookup, type Lookup } from "@/lib/use-lookup";
 import { saveReturn } from "./actions";
 import { ClosedRows } from "./closed-rows";
 import { CustomerPicker } from "./customer-picker";
 import { FillOldestFirst, type AskedSplit } from "./split-oldest-first";
-import { LoadState } from "./load-state";
 import { RowCounts, RowHeading } from "./row-heading";
 
-/** The dates the form starts from. */
-export interface FormDates {
+/** What the form offers, and the dates it starts from. */
+export interface FormChoices {
   startDate: string;
   today: string;
+  /** The gases that can be left unmatched. */
+  gases: Gas[];
 }
 
 type Row = PendingList["rows"][number];
@@ -69,17 +73,35 @@ function withSplit(entries: Record<string, Entry>, gasId: string, { rows }: Spli
   return next;
 }
 
+/** An unmatched row on the form. */
+type UnmatchedLine = FormLine & {
+  /** Set on the row holding what a fill could not place, which then follows the fill. */
+  fromSplit?: boolean;
+};
+
+/**
+ * The unmatched rows once a new split of the gas is in: the row that holds its
+ * leftover cylinders takes the new count, or goes if none are left over. Rows
+ * added by hand stay as they are.
+ */
+function withExcess(lines: UnmatchedLine[], gasId: string, { excess }: Split) {
+  return lines.flatMap((line) => {
+    if (!line.fromSplit || line.gasId !== gasId) return [line];
+    return excess > 0 ? [{ ...line, quantity: String(excess) }] : [];
+  });
+}
+
 /** What was typed as a count, which is none until it is one that could be saved. */
 function cylinders(typed: string): number {
   const quantity = Number(typed);
   return Number.isInteger(quantity) && quantity > 0 ? quantity : 0;
 }
 
-export function ReceiveForm({ dates }: { dates: FormDates | null }) {
-  const shown = useLastGiven(dates);
+export function ReceiveForm({ choices }: { choices: FormChoices | null }) {
+  const shown = useLastGiven(choices);
 
   return shown ? (
-    <Form dates={shown} />
+    <Form choices={shown} />
   ) : (
     <LoadError>
       The form could not be loaded. Check that the API is running, then reload the page.
@@ -87,12 +109,14 @@ export function ReceiveForm({ dates }: { dates: FormDates | null }) {
   );
 }
 
-function Form({ dates: { startDate, today } }: { dates: FormDates }) {
+function Form({ choices: { startDate, today, gases } }: { choices: FormChoices }) {
   const [customer, setCustomer] = useState<Choice | null>(null);
   const [date, setDate] = useState(today);
   const [slipNumber, setSlipNumber] = useState("");
   // Kept by bill and gas, so that a row keeps its entry while the list is loaded again.
   const [entries, setEntries] = useState<Record<string, Entry>>({});
+  // Cylinders beyond everything pending, which go against no bill.
+  const [unmatched, setUnmatched] = useState<UnmatchedLine[]>([]);
   // How many saves have been tried, after any of which the rows may have changed.
   const [saves, setSaves] = useState(0);
   const [retries, setRetries] = useState(0);
@@ -129,6 +153,7 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
   if (askedSplit && proposal && proposal !== applied) {
     setApplied(proposal);
     setEntries(withSplit(entries, askedSplit.gas.id, proposal));
+    setUnmatched(withExcess(unmatched, askedSplit.gas.id, proposal));
   }
   // Only what is typed on a row that is listed is saved, so what is typed on one
   // that has since left the list is pointed out.
@@ -146,9 +171,31 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
       : [{ billId: row.bill.id, gasId: row.gas.id, quantity: Number(quantity), fillState }];
   });
 
+  // Unmatched rows are on screen, and so counted and saved, only under a customer and date.
+  const shownUnmatched = customer && dated ? unmatched : [];
+  const returningNow =
+    returning.reduce((total, { quantity }) => total + cylinders(String(quantity)), 0) +
+    shownUnmatched.reduce((total, { quantity }) => total + cylinders(quantity), 0);
+
+  /** Puts this many of the gas under unmatched cylinders, in place of any there. */
+  function leaveUnmatched(gasId: string, quantity: number) {
+    const replaced = unmatched.find((line) => line.gasId === gasId);
+    setUnmatched([
+      ...unmatched.filter((line) => line.gasId !== gasId),
+      {
+        ...blankLine(nextKey(unmatched)),
+        gasId,
+        fillState: replaced?.fillState,
+        quantity: String(quantity),
+        fromSplit: true,
+      },
+    ]);
+  }
+
   function choose(chosen: Choice | null) {
     setCustomer(chosen);
     setEntries({});
+    setUnmatched([]);
     setSlipNumber("");
     setAskedSplit(null);
     if (chosen) setReceived(undefined);
@@ -164,6 +211,7 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
       date,
       slipNumber,
       allocations: returning,
+      unmatched: asNewLines(shownUnmatched, BLANK.fillState),
     });
     if (!data) {
       return { error: problem };
@@ -181,6 +229,7 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
     if (received) {
       setReceived(received);
       setEntries({});
+      setUnmatched([]);
       setSlipNumber("");
       setAskedSplit(null);
       // The next return is today's unless said otherwise.
@@ -237,6 +286,9 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
                         setAskedSplit({ gas, total });
                         setSplitsAsked((count) => count + 1);
                       }}
+                      unmatched={unmatched}
+                      canLeaveUnmatched={(gasId) => gases.some((gas) => gas.id === gasId)}
+                      onLeaveUnmatched={leaveUnmatched}
                     />
                   )}
                   <Pending
@@ -256,15 +308,30 @@ function Form({ dates: { startDate, today } }: { dates: FormDates }) {
               )}
             </div>
           </fieldset>
+          {customer && dated && (
+            <fieldset className="min-w-0 space-y-3 border-t border-slate-100 pt-4">
+              <legend className="float-left w-full font-semibold">Unmatched cylinders</legend>
+              <p className="clear-left text-sm text-slate-500">
+                Cylinders beyond everything {customer.name} has pending. Add a gas here only when
+                all of it that is pending on this date is being returned above.
+              </p>
+              <LineList
+                lines={unmatched}
+                onChange={setUnmatched}
+                gases={gases}
+                defaultFillState={BLANK.fillState}
+                addLabel="+ Add unmatched cylinders"
+                mayBeEmpty
+              />
+            </fieldset>
+          )}
           <p aria-live="polite" className="text-sm text-amber-800 empty:hidden">
             {leftOut > 0 &&
               `Not included: ${leftOut} typed against what is no longer listed. Check the rows before saving.`}
           </p>
           <p aria-live="polite" className="text-right text-sm tabular-nums">
             <span className="text-slate-500">Returning now </span>
-            <span className="font-semibold">
-              {returning.reduce((total, { quantity }) => total + cylinders(String(quantity)), 0)}
-            </span>
+            <span className="font-semibold">{returningNow}</span>
           </p>
         </ActionForm>
       </section>
@@ -377,7 +444,7 @@ function PendingRowFields({
 
 /** What was just saved: who returned how many, and against which bills. */
 function Confirmation({
-  received: { id, number, customer, quantity, bills },
+  received: { id, number, customer, quantity, unmatched, bills },
 }: {
   received: ReceivedReturn;
 }) {
@@ -399,16 +466,36 @@ function Confirmation({
       <Link href={billPath(id)} className={link}>
         {number}
       </Link>
-      : {customer.name} returned {quantity === 1 ? "1 cylinder" : `${quantity} cylinders`} against{" "}
-      {bills.map((bill, index) => (
-        <Fragment key={bill.id}>
-          {index > 0 && (index === bills.length - 1 ? " and " : ", ")}
-          <Link href={billPath(bill.id)} className={link}>
-            {pendingBillName(bill)}
-          </Link>
-        </Fragment>
-      ))}
+      : {customer.name} returned {quantity === 1 ? "1 cylinder" : `${quantity} cylinders`}
+      {bills.length === 0 ? (
+        quantity === 1 ? (
+          ", unmatched"
+        ) : (
+          ", all unmatched"
+        )
+      ) : (
+        <>
+          {unmatched > 0 ? `, ${quantity - unmatched} of them against ` : " against "}
+          {bills.map((bill, index) => (
+            <Fragment key={bill.id}>
+              {index > 0 && (index === bills.length - 1 ? " and " : ", ")}
+              <Link href={billPath(bill.id)} className={link}>
+                {pendingBillName(bill)}
+              </Link>
+            </Fragment>
+          ))}
+        </>
+      )}
       .
+      {unmatched > 0 && (
+        <>
+          {bills.length > 0 &&
+            ` The other ${unmatched} ${unmatched === 1 ? "is" : "are"} unmatched.`}{" "}
+          <Link href={UNMATCHED_RETURNS_PATH} className={link}>
+            See unmatched returns
+          </Link>
+        </>
+      )}
     </p>
   );
 }

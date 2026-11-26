@@ -143,7 +143,9 @@ In the API:
   that refiller, ignoring cancelled bills.
 - Reports only read. They work every figure out from posted bills, and no stock
   count is stored. Pending cylinders are likewise worked out, by
-  `src/services/pending.ts`, from the allocations of posted returns.
+  `src/services/pending.ts`, from the allocations of posted returns. Unmatched
+  ones are whatever a return's lines hold beyond their allocations, worked out
+  by `src/services/unmatched.ts`.
 - A calendar date is text such as `2026-11-26`; `src/database-date.ts` converts
   it for the database.
 - To turn a request down, throw a `Refusal` from `src/refusal.ts` with the status

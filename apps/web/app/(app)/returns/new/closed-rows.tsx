@@ -3,9 +3,9 @@
 import { closedRowListSchema } from "@gasflow/shared";
 import { useState } from "react";
 import { buttonStyles } from "@/components/button-styles";
+import { LoadState } from "@/components/load-state";
 import { RECEIVE_EMPTIES_PATH } from "@/lib/routes";
 import { useLookup } from "@/lib/use-lookup";
-import { LoadState } from "./load-state";
 import { RowCounts, RowHeading } from "./row-heading";
 
 const linkStyles = "text-sm text-brand-700 hover:underline";

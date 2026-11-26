@@ -19,6 +19,7 @@ import {
   startDateSchema,
   stockReportSchema,
   todaySchema,
+  unmatchedListSchema,
   vehicleListSchema,
   type Bill,
   type BillList,
@@ -47,6 +48,8 @@ import {
   type StartDate,
   type StockReport,
   type StockReportQuery,
+  type UnmatchedList,
+  type UnmatchedListQuery,
   type VehicleList,
 } from "@gasflow/shared";
 import { refresh } from "next/cache";
@@ -125,6 +128,11 @@ export async function fetchClosedRows({
 }: ClosedRowListQuery): Promise<ClosedRowList> {
   const search = new URLSearchParams({ ...query, page: String(page) });
   return closedRowListSchema.parse(await getJson(`/api/returns/closed?${search}`));
+}
+
+/** One page of the unmatched returns. */
+export async function fetchUnmatched({ page }: UnmatchedListQuery): Promise<UnmatchedList> {
+  return unmatchedListSchema.parse(await getJson(`/api/returns/unmatched?page=${page}`));
 }
 
 export async function fetchStartDate(): Promise<StartDate> {

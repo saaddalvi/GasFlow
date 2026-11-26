@@ -4,12 +4,14 @@ import {
   closedRowListSchema,
   splitSchema,
   gasListSchema,
+  matchedSchema,
   partySchema,
   pendingListSchema,
   receivedReturnSchema,
   returnCustomerListSchema,
   shopSchema,
   stockReportSchema,
+  unmatchedListSchema,
   vehicleSchema,
   type FillState,
   type PartyType,
@@ -184,6 +186,17 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     change: { fillState?: FillState } = {},
   ) => ({ billId: bill.id, gasId: gas(name).id, quantity, ...change });
 
+  /** One unmatched row of Receive empties as it is sent. */
+  const unmatchedRow = (
+    name: string,
+    quantity: number,
+    change: { fillState?: FillState } = {},
+  ) => ({
+    gasId: gas(name).id,
+    quantity,
+    ...change,
+  });
+
   /** What Receive empties sends. A test changes whatever matters to it. */
   const returnFor = (customerId: string, allocations: object[], change: object = {}) => ({
     customerId,
@@ -201,6 +214,20 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     const response = await postReturn(returnFor(customerId, allocations, change));
     expect(response.statusCode).toBe(201);
     return receivedReturnSchema.parse(response.json());
+  }
+
+  /** Asks to match unmatched cylinders on a return, as the staff member unless told otherwise. */
+  const postMatch = (
+    returned: { id: string },
+    payload: object,
+    { headers }: { headers: Record<string, string> } = staff,
+  ) => app.inject({ method: "POST", url: `/api/returns/${returned.id}/matches`, headers, payload });
+
+  /** Matches unmatched cylinders to a bill, expecting that to be saved. */
+  async function match(returned: { id: string }, row: object) {
+    const response = await postMatch(returned, row);
+    expect(response.statusCode).toBe(201);
+    return matchedSchema.parse(response.json());
   }
 
   /** What Receive empties lists for the customer on a date. */
@@ -247,6 +274,13 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     const response = await get(`/api/returns/customers?${query}`);
     expect(response.statusCode).toBe(200);
     return returnCustomerListSchema.parse(response.json());
+  }
+
+  /** One page of the unmatched returns, for a query such as "page=2". */
+  async function unmatchedList(query = "") {
+    const response = await get(`/api/returns/unmatched?${query}`);
+    expect(response.statusCode).toBe(200);
+    return unmatchedListSchema.parse(response.json());
   }
 
   /** The bill as its page shows it. */
@@ -301,14 +335,18 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     refillerReturnFor,
     refillerReturn,
     against,
+    unmatchedRow,
     returnFor,
     postReturn,
     receive,
+    postMatch,
+    match,
     pending,
     askSplit,
     split,
     closed,
     returnCustomers,
+    unmatchedList,
     viewBill,
     report,
     figures,

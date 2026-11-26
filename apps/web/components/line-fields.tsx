@@ -46,6 +46,8 @@ export function LineList({
   onChange,
   gases,
   defaultFillState,
+  addLabel = "+ Add line",
+  mayBeEmpty = false,
   children,
 }: {
   lines: FormLine[];
@@ -53,6 +55,10 @@ export function LineList({
   gases: Gas[];
   /** What a line shows until a fill state is chosen for it. */
   defaultFillState: FillState;
+  /** The words on the button that adds a line. */
+  addLabel?: string;
+  /** Whether the last line can be removed too. */
+  mayBeEmpty?: boolean;
   /** Further buttons, beside the one that adds a line. */
   children?: React.ReactNode;
 }) {
@@ -74,7 +80,7 @@ export function LineList({
                 )
               }
               onRemove={
-                lines.length > 1
+                mayBeEmpty || lines.length > 1
                   ? () => onChange(lines.filter((other) => other.key !== line.key))
                   : undefined
               }
@@ -88,7 +94,7 @@ export function LineList({
           onClick={() => onChange([...lines, blankLine(nextKey(lines))])}
           className={buttonStyles.secondary}
         >
-          + Add line
+          {addLabel}
         </button>
         {children}
       </div>

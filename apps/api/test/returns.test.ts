@@ -20,6 +20,7 @@ test("staff receive empties against a dispatch bill, as one numbered return", as
     number: "RET-20261126-001",
     customer: { id: customer.id, name: "City Hospital" },
     quantity: 3,
+    unmatched: 0,
     bills: [{ id: sent.id, paperKind: "bill", number: "1234" }],
   });
   expect(await viewBill(received.id)).toMatchObject({

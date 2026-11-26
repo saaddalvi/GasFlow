@@ -1,11 +1,14 @@
 import {
   PAPER_KIND_NAMES,
   pendingBillName,
+  type Matched,
   type NewAllocation,
   type NewBill,
   type NewBillLine,
+  type NewMatch,
   type NewOpeningStock,
   type NewReturn,
+  type NewUnmatched,
   type ReceivedReturn,
   type Staff,
 } from "@gasflow/shared";
@@ -16,9 +19,10 @@ import { Refusal } from "../refusal";
 import { noSuchBill, POSTED_OPENING_STOCK } from "./bills";
 import { noSuchGas } from "./gases";
 import { noSuchParty } from "./parties";
-import { findClearableLines, type ClearableLine } from "./pending";
+import { findClearableLines, findPendingRows, type ClearableLine } from "./pending";
 import { getStartDate } from "./setup";
 import { getShop } from "./shop";
+import { findUnmatchedLines, noSuchReturn } from "./unmatched";
 import { noSuchVehicle } from "./vehicles";
 
 // The bill ledger: the one place that changes bills. Each operation checks every
@@ -133,13 +137,14 @@ export function enterBill(
 
 /**
  * Records cylinders a customer has brought back to the shop, as one return that
- * is matched to the bills they went out on. Gives what its confirmation names.
+ * is matched to the bills they went out on. Those beyond everything pending are
+ * left unmatched. Gives what its confirmation names.
  */
 export function receiveReturn(
   db: Database,
   clock: Clock,
   staff: Staff,
-  { customerId, date, slipNumber, allocations }: NewReturn,
+  { customerId, date, slipNumber, allocations, unmatched }: NewReturn,
 ): Promise<ReceivedReturn> {
   return db.$transaction(async (tx) => {
     await refuseUnrecordedDate(tx, date);
@@ -156,7 +161,12 @@ export function receiveReturn(
       allocations,
       billLines,
     });
-    const lines = allocate(billLines, allocations);
+    await refuseUnusableGases(tx, unmatched);
+    await refuseUnmatchedWhilePending(tx, { id: customerId, name: customer.name }, date, {
+      allocations,
+      unmatched,
+    });
+    const lines = returnLines(billLines, allocations, unmatched);
     const shop = await getShop(tx);
     const saved = await tx.bill.create({
       data: {
@@ -175,7 +185,8 @@ export function receiveReturn(
     return {
       ...saved,
       customer: { id: customerId, name: customer.name },
-      quantity: lines.reduce((sum, line) => sum + line.quantity, 0),
+      quantity: totalOf(lines),
+      unmatched: totalOf(unmatched),
       // Each bill once, in the order its lines came in.
       bills: [
         ...new Map(
@@ -187,6 +198,61 @@ export function receiveReturn(
 }
 
 /**
+ * Matches some of a return's unmatched cylinders of one gas to a dispatch bill or
+ * opening stock, and says how many of the gas the return still has unmatched.
+ * The return's own lines stay as they were saved.
+ */
+export function matchUnmatched(db: Database, returnId: string, match: NewMatch): Promise<Matched> {
+  const { billId, gasId, quantity } = match;
+  return db.$transaction(async (tx) => {
+    const returnBill = await tx.bill.findUnique({
+      where: { id: returnId, type: "return_from_customer" },
+      select: { number: true, date: true, fromPartyId: true },
+    });
+    if (!returnBill) {
+      throw noSuchReturn();
+    }
+    // Every return names the customer it came from, which never changes.
+    const customerId = returnBill.fromPartyId!;
+    const customer = await lockParty(tx, customerId);
+    // Both sides are read after the customer is locked, so that they include
+    // whatever a save just before this one matched.
+    const billLines = await findClearableLines(tx, customerId, [billId]);
+    await refuseUnusableAllocations(
+      tx,
+      { id: customerId, name: customer.name },
+      fromDatabaseDate(returnBill.date),
+      { allocations: [match], billLines },
+    );
+    const unmatchedLines = await findUnmatchedLines(tx, returnId, gasId);
+    const unmatched = unmatchedLines.reduce((sum, line) => sum + line.unmatched, 0);
+    const ofGas = billLines.filter((line) => line.gasId === gasId);
+    if (quantity > unmatched) {
+      // The bill was found to have the gas, so one of its lines names it.
+      const { gasName } = ofGas[0]!;
+      throw new Refusal(
+        409,
+        `${returnBill.number} has ${unmatched ? `only ${unmatched}` : "no"} ${gasName} unmatched.`,
+      );
+    }
+    const cleared = ofGas.map(({ lineId, pending }) => ({ lineId, left: pending }));
+    const clearing = unmatchedLines.map(({ lineId, unmatched }) => ({ lineId, left: unmatched }));
+    for (const from of takeInTurn(clearing, quantity)) {
+      for (const to of takeInTurn(cleared, from.quantity)) {
+        const pair = { clearingLineId: from.lineId, clearedLineId: to.lineId };
+        // An earlier match may have joined these two lines already.
+        await tx.allocation.upsert({
+          where: { clearingLineId_clearedLineId: pair },
+          create: { ...pair, quantity: to.quantity },
+          update: { quantity: { increment: to.quantity } },
+        });
+      }
+    }
+    return { unmatched: unmatched - quantity };
+  });
+}
+
+/**
  * Refuses cylinders returned against anything but the customer's own bills dated
  * on or before the return, or more of them than a bill has pending of that gas.
  */
@@ -194,7 +260,13 @@ async function refuseUnusableAllocations(
   tx: Transaction,
   customer: { id: string; name: string },
   date: string,
-  { allocations, billLines }: { allocations: NewAllocation[]; billLines: ClearableLine[] },
+  {
+    allocations,
+    billLines,
+  }: {
+    allocations: Pick<NewAllocation, "billId" | "gasId" | "quantity">[];
+    billLines: ClearableLine[];
+  },
 ): Promise<void> {
   const bills = await tx.bill.findMany({
     where: { id: { in: allocations.map((allocation) => allocation.billId) } },
@@ -239,31 +311,69 @@ async function refuseUnusableAllocations(
 }
 
 /**
+ * Refuses cylinders left unmatched while the customer has any of their gas still
+ * pending on a bill dated on or before the return, once the return's own
+ * allocations are taken off.
+ */
+async function refuseUnmatchedWhilePending(
+  tx: Transaction,
+  customer: { id: string; name: string },
+  date: string,
+  { allocations, unmatched }: Pick<NewReturn, "allocations" | "unmatched">,
+): Promise<void> {
+  if (unmatched.length === 0) {
+    return;
+  }
+  const rows = await findPendingRows(tx, customer.id, date);
+  for (const { gasId } of unmatched) {
+    const ofGas = rows.filter((row) => row.gas.id === gasId);
+    const [row] = ofGas;
+    if (!row) {
+      continue;
+    }
+    const left =
+      ofGas.reduce((sum, other) => sum + other.pending, 0) -
+      totalOf(allocations.filter((allocation) => allocation.gasId === gasId));
+    if (left > 0) {
+      throw new Refusal(
+        409,
+        `${customer.name} still has ${left} ${row.gas.name} pending on this date. ` +
+          "Return those against their bills before leaving any unmatched.",
+      );
+    }
+  }
+}
+
+/**
  * Matches what is being returned to lines of the bills it is returned against,
  * and gives the return's own lines, one for each gas and fill state, each with
- * its allocations.
+ * its allocations. A line holds its unmatched cylinders too, as the part of its
+ * quantity that no allocation covers.
  */
-function allocate(billLines: ClearableLine[], allocations: NewAllocation[]) {
-  const pending = new Map(billLines.map((line) => [line.lineId, line.pending]));
+function returnLines(
+  billLines: ClearableLine[],
+  allocations: NewAllocation[],
+  unmatched: NewUnmatched[],
+) {
+  const cleared = billLines.map((line) => ({ ...line, left: line.pending }));
   const returned = new Map<string, NewBillLine & { clears: Map<string, number> }>();
-  for (const { billId, gasId, fillState, quantity } of allocations) {
+  /** Puts the cylinders on the line of their gas and fill state, and gives that line. */
+  function add({ gasId, fillState, quantity }: NewBillLine) {
     const key = `${gasId} ${fillState}`;
     const line = returned.get(key) ?? { gasId, fillState, quantity: 0, clears: new Map() };
     returned.set(key, line);
     line.quantity += quantity;
-    let left = quantity;
-    // A bill may have several lines of one gas, which are used up in turn.
-    for (const { lineId, ...on } of billLines) {
-      if (on.billId === billId && on.gasId === gasId) {
-        const used = Math.min(left, pending.get(lineId)!);
-        if (used > 0) {
-          line.clears.set(lineId, (line.clears.get(lineId) ?? 0) + used);
-          pending.set(lineId, pending.get(lineId)! - used);
-          left -= used;
-        }
-      }
+    return line;
+  }
+  for (const { billId, gasId, fillState, quantity } of allocations) {
+    const line = add({ gasId, fillState, quantity });
+    // A bill may have several lines of one gas.
+    const onBill = cleared.filter((other) => other.billId === billId && other.gasId === gasId);
+    for (const { lineId, quantity: used } of takeInTurn(onBill, quantity)) {
+      line.clears.set(lineId, (line.clears.get(lineId) ?? 0) + used);
     }
   }
+  unmatched.forEach(add);
   return [...returned.values()].map(({ clears, ...line }, index) => ({
     ...line,
     lineNo: index + 1,
@@ -372,6 +482,28 @@ async function issueNumber(tx: Transaction, prefix: string, date: string): Promi
     RETURNING last
   `;
   return `${prefix}-${date.replaceAll("-", "")}-${String(counter.last).padStart(3, "0")}`;
+}
+
+/**
+ * Takes the quantity from the lines in turn, lowering what each has left, and
+ * says how much came from each.
+ */
+function takeInTurn(lines: { lineId: string; left: number }[], quantity: number) {
+  const taken: { lineId: string; quantity: number }[] = [];
+  for (const line of lines) {
+    const used = Math.min(quantity, line.left);
+    if (used > 0) {
+      line.left -= used;
+      quantity -= used;
+      taken.push({ lineId: line.lineId, quantity: used });
+    }
+  }
+  return taken;
+}
+
+/** The cylinders on all these together. */
+function totalOf(rows: { quantity: number }[]): number {
+  return rows.reduce((sum, row) => sum + row.quantity, 0);
 }
 
 /** The lines as they are saved, each with its place on the bill. */

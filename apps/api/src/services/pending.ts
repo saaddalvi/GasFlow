@@ -19,7 +19,8 @@ import { noSuchGas } from "./gases";
 import { listParties, noSuchParty } from "./parties";
 
 // What customers have yet to return. It is worked out from the posted bills and
-// the allocations of posted returns, and never stored.
+// the allocations of posted returns, and never stored. What came back beyond it
+// is in unmatched.ts.
 
 const CLOSED_PAGE_SIZE = 50;
 
@@ -88,17 +89,27 @@ export async function listPending(
 ): Promise<PendingList> {
   await refuseUnknownCustomer(db, customerId);
   const now = today(clock);
+  const rows = await findPendingRows(db, customerId, date);
+  return {
+    rows: rows.map((row) => ({ ...row, daysOut: daysBetween(row.bill.date, now) })),
+  };
+}
+
+/**
+ * The rows, dated on or before the date, with cylinders of the customer's still
+ * pending, the oldest first.
+ */
+export async function findPendingRows(
+  db: Database | Transaction,
+  customerId: string,
+  date: string,
+): Promise<PendingRow[]> {
   const rows = await db.$queryRaw<Row[]>`
     ${rowsOf(customerId, date)}
     HAVING SUM(c.sent) > SUM(c.returned)
     ORDER BY ${OLDEST_FIRST}, MIN(c.line_no)
   `;
-  return {
-    rows: rows.map((row) => {
-      const reported = asRow(row);
-      return { ...reported, daysOut: daysBetween(reported.bill.date, now) };
-    }),
-  };
+  return rows.map(asRow);
 }
 
 /**
