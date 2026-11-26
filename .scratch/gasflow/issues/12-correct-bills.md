@@ -18,7 +18,7 @@
 
 ## Comments
 
-**27 November 2026: built in commit `963ce5f`, waiting on a check by hand.** Not pushed, so CI has not run on it.
+**27 November 2026: built in commit `963ce5f`, waiting on a check by hand.** Pushed later, as below.
 
 Still to do, signed in with real accounts. Run `pnpm db:migrate` first; the bill page needs the new table.
 
@@ -84,7 +84,7 @@ Seen:
 
 Still to do: correct a bill on a real phone. Safari and Firefox have not been tried.
 
-**27 November 2026: completed** in commits `963ce5f` and `d83cc12`. Not pushed when this was written, so CI has not run on them.
+**27 November 2026: completed** in commits `963ce5f` and `d83cc12`. They were pushed to `main` with the notes up to `126190a`, on which CI passed.
 
 - The project owner asked for the boxes to be ticked. No results of a check on a real phone are recorded here. The phone check was on the emulated phone described above.
 - `pnpm check`, with 527 tests, and `pnpm build` pass with the corner fix. The fix was looked at in Chrome on a copy of the box's markup with the app's built styles, not on the bill page itself.
