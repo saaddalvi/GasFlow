@@ -16,7 +16,7 @@
 - [x] The bill list shows number, date, type, from and to, lines and status, a page at a time
 - [x] The bill page shows the details, lines and who entered it
 - [x] The Stock report reflects the dispatch; a dispatch larger than recorded shop stock is accepted and the negative count is flagged
-- [ ] The form is usable on a phone
+- [x] The form is usable on a phone
 
 ## Comments
 
@@ -57,3 +57,10 @@ For later tickets:
 - Ticket 12: the number warning has to leave out the bill being corrected.
 - Tickets 07, 12 and 13: bill forms share `LineList` in `apps/web/components/line-fields.tsx`.
 
+**26 November 2026: completed** in commits `a68f905` and `0d06bae`. Both are pushed; the CI result has not been checked.
+
+- The project owner asked for the ticket to be marked completed. No results of checks on a real phone or signed in with real accounts were recorded here.
+- The checks under "Still to do" were run through Playwright MCP in headless Chromium, with sign-in replaced by the identity stand-in, on a copy of the development database. The phone was an emulated Pixel 7, and the bill was made-up data, not a paper copy.
+- Those checks passed except that below 360 pixels wide the new bill form spilled past its card. `0d06bae` fixes this. The fix was checked at 320, 340, 360, 412 and 768 wide on a copy of the app, and `pnpm check` (256 tests) passes with it.
+- Both new migrations were applied to the development database.
+- The decisions listed for the project owner are not recorded as settled.
