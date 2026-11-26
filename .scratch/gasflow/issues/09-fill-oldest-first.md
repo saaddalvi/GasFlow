@@ -16,7 +16,7 @@
 
 ## Comments
 
-**26 November 2026: built in commits `44f1ba5` and `38de2ba`.** Not pushed, so CI has not run on it.
+**26 November 2026: built in commits `44f1ba5` and `38de2ba`.** Pushed to `main`, and CI passed.
 
 How it works:
 
