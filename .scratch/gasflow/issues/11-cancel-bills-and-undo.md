@@ -6,16 +6,16 @@
 
 **Status:** ready-for-agent
 
-- [ ] Cancelling needs a reason (data entry error, duplicate entry, customer rejected, wrong cylinder loaded, bill voided or other), takes optional notes, and is confirmed first
-- [ ] A cancelled bill cannot be restored, stays visible with who cancelled it, when and why, and has no effect on any figure
-- [ ] The bill list can filter by posted or cancelled
-- [ ] A cancelled bill's number can be used again
-- [ ] Staff can cancel only bills they entered today (Indian Standard Time); admins can cancel any; only admins can cancel opening stock
-- [ ] After opening stock is cancelled, a new one can be entered for that party
-- [ ] Cancelling a return restores pending on the bills it was allocated to
-- [ ] A dispatch bill or opening stock with allocations cannot be cancelled, and the refusal links to each blocking bill
-- [ ] A cancellation and a return against the same bill sent at the same moment cannot both succeed
-- [ ] After saving Receive empties, an Undo shown for about 10 seconds cancels that return with the reason data entry error
+- [x] Cancelling needs a reason (data entry error, duplicate entry, customer rejected, wrong cylinder loaded, bill voided or other), takes optional notes, and is confirmed first
+- [x] A cancelled bill cannot be restored, stays visible with who cancelled it, when and why, and has no effect on any figure
+- [x] The bill list can filter by posted or cancelled
+- [x] A cancelled bill's number can be used again
+- [x] Staff can cancel only bills they entered today (Indian Standard Time); admins can cancel any; only admins can cancel opening stock
+- [x] After opening stock is cancelled, a new one can be entered for that party
+- [x] Cancelling a return restores pending on the bills it was allocated to
+- [x] A dispatch bill or opening stock with allocations cannot be cancelled, and the refusal links to each blocking bill
+- [x] A cancellation and a return against the same bill sent at the same moment cannot both succeed
+- [x] After saving Receive empties, an Undo shown for about 10 seconds cancels that return with the reason data entry error
 
 ## Comments
 
@@ -74,3 +74,8 @@ Run in headless Chrome through the Playwright MCP against commit `888c307`, sign
 No page errors were raised. The console showed only a missing `favicon.ico` and Clerk's development keys warning.
 
 Still to do: Receive empties and **Undo** on a real phone. Safari and Firefox have not been tried.
+
+**27 November 2026: completed** in commit `888c307`. It was pushed with the notes up to `a298e4a`, on which CI passed.
+
+- The project owner asked for the finished boxes to be ticked. No results of a check on a real phone are recorded here. The last box is ticked on the strength of the emulated phone described above.
+- The decisions listed for the project owner are not recorded as settled.
