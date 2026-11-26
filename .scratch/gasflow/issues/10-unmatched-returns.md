@@ -6,19 +6,19 @@
 
 **Status:** ready-for-agent
 
-- [ ] Receive empties lets staff add a gas and quantity as unmatched, alone or alongside allocated rows
-- [ ] Saving is refused if cylinders are left unmatched while eligible pending cylinders of that gas remain after this return's allocations
-- [ ] A customer with nothing pending can be chosen and their cylinders saved as unmatched
-- [ ] Unmatched cylinders count as back at the shop and reduce the customer's holding
-- [ ] A list shows all unmatched returns with customer, gas, quantity, date and return number
-- [ ] Any staff member can use "Match to bill" to allocate all or part of an unmatched quantity to a bill or opening stock of the same customer and gas, dated on or before the return
-- [ ] Matching never exceeds the pending or unmatched quantity, including when two saves happen at once
-- [ ] A customer's holding of each gas equals pending minus unmatched after returns and matching
-- [ ] Unmatched cylinders may remain alongside pending ones after a missing dispatch bill is entered, until matched
+- [x] Receive empties lets staff add a gas and quantity as unmatched, alone or alongside allocated rows
+- [x] Saving is refused if cylinders are left unmatched while eligible pending cylinders of that gas remain after this return's allocations
+- [x] A customer with nothing pending can be chosen and their cylinders saved as unmatched
+- [x] Unmatched cylinders count as back at the shop and reduce the customer's holding
+- [x] A list shows all unmatched returns with customer, gas, quantity, date and return number
+- [x] Any staff member can use "Match to bill" to allocate all or part of an unmatched quantity to a bill or opening stock of the same customer and gas, dated on or before the return
+- [x] Matching never exceeds the pending or unmatched quantity, including when two saves happen at once
+- [x] A customer's holding of each gas equals pending minus unmatched after returns and matching
+- [x] Unmatched cylinders may remain alongside pending ones after a missing dispatch bill is entered, until matched
 
 ## Comments
 
-**26 November 2026: built in commits `94911b1` and `7c86ccc`.** Not pushed, so CI has not run on it.
+**26 November 2026: built in commits `94911b1` and `7c86ccc`.**
 
 How it works:
 
@@ -49,3 +49,8 @@ For later tickets:
 - Ticket 14: a customer write-off is never unmatched. The unmatched list reads returns only.
 - Ticket 17: the customer's page will need the unmatched list narrowed to one customer.
 - Ticket 20: matching adds to the return's allocations, so a stock card can show a return against a bill entered after it.
+
+**26 November 2026: completed** in commits `94911b1` and `7c86ccc`.
+
+- The project owner asked for the ticket to be marked completed and pushed. No results of a check by hand with real accounts or on a real phone are recorded here. The screens were last checked as described above, with sign-in replaced by the identity stand-in.
+- The decisions listed for the project owner are not recorded as settled.
