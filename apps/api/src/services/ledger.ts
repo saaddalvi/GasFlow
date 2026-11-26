@@ -1,10 +1,13 @@
 import {
+  billName,
   PAPER_KIND_NAMES,
   pendingBillName,
+  whyNotCancel,
   type Matched,
   type NewAllocation,
   type NewBill,
   type NewBillLine,
+  type NewCancellation,
   type NewMatch,
   type NewOpeningStock,
   type NewReturn,
@@ -12,10 +15,10 @@ import {
   type ReceivedReturn,
   type Staff,
 } from "@gasflow/shared";
-import type { Clock } from "../clock";
+import { today, type Clock } from "../clock";
 import { isRepeat, type Database, type Transaction } from "../database";
 import { fromDatabaseDate, toDatabaseDate } from "../database-date";
-import { Refusal } from "../refusal";
+import { BlockedRefusal, Refusal } from "../refusal";
 import { noSuchBill, POSTED_OPENING_STOCK } from "./bills";
 import { noSuchGas } from "./gases";
 import { noSuchParty } from "./parties";
@@ -216,7 +219,14 @@ export function matchUnmatched(db: Database, returnId: string, match: NewMatch):
     const customerId = returnBill.fromPartyId!;
     const customer = await lockParty(tx, customerId);
     // Both sides are read after the customer is locked, so that they include
-    // whatever a save just before this one matched.
+    // whatever a save just before this one matched or cancelled.
+    const { status } = await tx.bill.findUniqueOrThrow({
+      where: { id: returnId },
+      select: { status: true },
+    });
+    if (status === "cancelled") {
+      throw new Refusal(409, `${returnBill.number} has been cancelled.`);
+    }
     const billLines = await findClearableLines(tx, customerId, [billId]);
     await refuseUnusableAllocations(
       tx,
@@ -253,6 +263,101 @@ export function matchUnmatched(db: Database, returnId: string, match: NewMatch):
 }
 
 /**
+ * Cancels a bill for good, so that it no longer counts towards any figure. It
+ * stays, saying who cancelled it, when and why, and its number is free again.
+ */
+export function cancelBill(
+  db: Database,
+  clock: Clock,
+  staff: Staff,
+  billId: string,
+  { reason, notes }: NewCancellation,
+): Promise<void> {
+  return db.$transaction(async (tx) => {
+    const named = await tx.bill.findUnique({
+      where: { id: billId },
+      select: { fromParty: { select: SIDE }, toParty: { select: SIDE } },
+    });
+    if (!named) {
+      throw noSuchBill();
+    }
+    await lockParty(tx, partyConcerned(named));
+    // Read after the party is locked, so that it includes whatever a save just
+    // before this one changed.
+    const bill = await tx.bill.findUniqueOrThrow({
+      where: { id: billId },
+      select: {
+        type: true,
+        paperKind: true,
+        number: true,
+        status: true,
+        enteredBy: { select: { id: true } },
+        enteredAt: true,
+      },
+    });
+    const notAllowed = whyNotCancel(bill, staff, today(clock));
+    if (notAllowed) {
+      throw new Refusal(403, notAllowed);
+    }
+    if (bill.status === "cancelled") {
+      throw new Refusal(409, "This bill has already been cancelled.");
+    }
+    await refuseWhileReturnedAgainst(tx, billId, bill);
+    await tx.bill.update({
+      where: { id: billId },
+      data: {
+        status: "cancelled",
+        cancelReason: reason,
+        cancelNotes: notes,
+        cancelledById: staff.id,
+        cancelledAt: clock.now(),
+      },
+    });
+  });
+}
+
+/**
+ * Refuses a change to a dispatch bill or opening stock that posted returns are
+ * matched to, naming each of them, the oldest first.
+ */
+async function refuseWhileReturnedAgainst(
+  tx: Transaction,
+  billId: string,
+  bill: Parameters<typeof pendingBillName>[0],
+): Promise<void> {
+  const returns = await tx.bill.findMany({
+    where: {
+      status: "posted",
+      lines: { some: { clears: { some: { clearedLine: { billId } } } } },
+    },
+    select: { id: true, number: true },
+    orderBy: [{ date: "asc" }, { enteredAt: "asc" }, { id: "asc" }],
+  });
+  if (returns.length > 0) {
+    // Only dispatch bills and opening stock have anything matched to them.
+    throw new BlockedRefusal(
+      `${pendingBillName(bill)} has returns matched to it. Cancel those first.`,
+      returns,
+    );
+  }
+}
+
+const SIDE = { id: true, type: true } as const;
+
+/**
+ * Whom two changes to a bill take turns by: the party named on it beside the
+ * shop, or the shop itself on its own opening stock.
+ */
+function partyConcerned({
+  fromParty,
+  toParty,
+}: Record<"fromParty" | "toParty", { id: string; type: string } | null>): string {
+  const parties = [fromParty, toParty].filter((party) => party !== null);
+  // Every bill names a party, by a check in the database.
+  return (parties.find((party) => party.type !== "shop") ?? parties[0]!).id;
+}
+
+/**
  * Refuses cylinders returned against anything but the customer's own bills dated
  * on or before the return, or more of them than a bill has pending of that gas.
  */
@@ -270,7 +375,7 @@ async function refuseUnusableAllocations(
 ): Promise<void> {
   const bills = await tx.bill.findMany({
     where: { id: { in: allocations.map((allocation) => allocation.billId) } },
-    select: { id: true, number: true, date: true },
+    select: { id: true, type: true, paperKind: true, number: true, date: true, status: true },
   });
   /** What has been asked of each bill and gas so far, on the rows before and this one. */
   const asked = new Map<string, number>();
@@ -278,6 +383,12 @@ async function refuseUnusableAllocations(
     const bill = bills.find((candidate) => candidate.id === billId);
     if (!bill) {
       throw noSuchBill();
+    }
+    // As when a colleague cancels it while it is on screen.
+    if (bill.status === "cancelled") {
+      // Opening stock goes by that, as on the rows it is returned against.
+      const name = bill.type === "opening_stock" ? pendingBillName(bill) : billName(bill);
+      throw new Refusal(409, `${name} has been cancelled.`);
     }
     const onBill = billLines.filter((line) => line.billId === billId);
     const [first] = onBill;

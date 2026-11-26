@@ -14,7 +14,7 @@ import {
   type ReceivedReturn,
 } from "@gasflow/shared";
 import Link from "next/link";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import { ActionForm } from "@/components/action-form";
 import { BillDateField } from "@/components/bill-date-field";
 import { buttonStyles } from "@/components/button-styles";
@@ -29,6 +29,7 @@ import { holdEnter } from "@/lib/hold-enter";
 import { billPath, RECEIVE_EMPTIES_PATH, UNMATCHED_RETURNS_PATH } from "@/lib/routes";
 import { useLastGiven } from "@/lib/use-last-given";
 import { useLookup, type Lookup } from "@/lib/use-lookup";
+import { cancelBill } from "../../bills/actions";
 import { saveReturn } from "./actions";
 import { ClosedRows } from "./closed-rows";
 import { CustomerPicker } from "./customer-picker";
@@ -117,8 +118,9 @@ function Form({ choices: { startDate, today, gases } }: { choices: FormChoices }
   const [entries, setEntries] = useState<Record<string, Entry>>({});
   // Cylinders beyond everything pending, which go against no bill.
   const [unmatched, setUnmatched] = useState<UnmatchedLine[]>([]);
-  // How many saves have been tried, after any of which the rows may have changed.
-  const [saves, setSaves] = useState(0);
+  // How many saves and Undos have been tried, after any of which the rows may
+  // have changed.
+  const [changesTried, setChangesTried] = useState(0);
   const [retries, setRetries] = useState(0);
   const [received, setReceived] = useState<ReceivedReturn>();
   const [askedSplit, setAskedSplit] = useState<AskedSplit | null>(null);
@@ -131,7 +133,7 @@ function Form({ choices: { startDate, today, gases } }: { choices: FormChoices }
       ? `${RECEIVE_EMPTIES_PATH}/pending?${new URLSearchParams({ customerId: customer.id, date }).toString()}`
       : null,
     pendingListSchema,
-    saves + retries,
+    changesTried + retries,
   );
   const rows = answer?.data?.rows;
   // Asked again whenever the date changes, so that the split follows it.
@@ -198,14 +200,12 @@ function Form({ choices: { startDate, today, gases } }: { choices: FormChoices }
     setUnmatched([]);
     setSlipNumber("");
     setAskedSplit(null);
-    if (chosen) setReceived(undefined);
   }
 
   async function submit(): Promise<Outcome> {
     if (customer && dated && !rows) {
       return { error: "Wait for the pending cylinders to be listed, then save." };
     }
-    setReceived(undefined);
     const { data, problem } = checkInput(newReturnSchema, {
       customerId: customer?.id ?? "",
       date,
@@ -218,7 +218,7 @@ function Form({ choices: { startDate, today, gases } }: { choices: FormChoices }
     }
     const answer = await saveReturn(data).catch(() => null);
     // Whatever came of it, the rows are asked for again.
-    setSaves((count) => count + 1);
+    setChangesTried((count) => count + 1);
     if (!answer) {
       return {
         error:
@@ -242,13 +242,24 @@ function Form({ choices: { startDate, today, gases } }: { choices: FormChoices }
     // The page stays where it is put while the rows load again. See globals.css.
     <div data-holds-scroll className="max-w-4xl space-y-4">
       {/* Always here, so that what appears in it is read out. */}
-      <div role="status">{received && <Confirmation received={received} />}</div>
+      <div role="status">
+        {/* Stays until the next save that works, so that moving on does not take
+            Undo away. */}
+        {received && (
+          <Confirmation
+            key={received.id}
+            received={received}
+            // Whatever came of it, the rows are asked for again.
+            onUndoTried={() => setChangesTried((count) => count + 1)}
+          />
+        )}
+      </div>
       <section onKeyDown={holdEnter} className="rounded-xl border border-slate-200 bg-white p-5">
         <ActionForm action={submit} submitLabel="Save returns">
           <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               {/* On load only. After a save it would scroll the confirmation away. */}
-              <CustomerPicker chosen={customer} onChoose={choose} focused={saves === 0} />
+              <CustomerPicker chosen={customer} onChoose={choose} focused={changesTried === 0} />
             </div>
             <BillDateField startDate={startDate} today={today} value={date} onChange={setDate} />
             <Field
@@ -302,7 +313,7 @@ function Form({ choices: { startDate, today, gases } }: { choices: FormChoices }
                     key={`closed ${customer.id}`}
                     customerId={customer.id}
                     date={date}
-                    askAgain={saves}
+                    askAgain={changesTried}
                   />
                 </>
               )}
@@ -442,26 +453,108 @@ function PendingRowFields({
   );
 }
 
-/** What was just saved: who returned how many, and against which bills. */
+/**
+ * What was just saved: who returned how many, and against which bills. For a
+ * little while it can be undone.
+ */
 function Confirmation({
+  received,
+  onUndoTried,
+}: {
+  received: ReceivedReturn;
+  onUndoTried: () => void;
+}) {
+  const { id, number } = received;
+  const shown = useRef<HTMLDivElement>(null);
+  const { offered, undoing, undone, error, undo } = useUndo(id, onUndoTried);
+
+  // The button that saved is at the foot of a form that may be long.
+  useEffect(() => {
+    shown.current?.scrollIntoView({ block: "nearest" });
+  }, []);
+
+  return (
+    // The margin keeps it clear of the navigation bar, which stays at the top.
+    <div
+      ref={shown}
+      className={`scroll-mt-20 space-y-2 rounded-lg border px-4 py-3 text-sm wrap-anywhere ${
+        undone
+          ? "border-slate-200 bg-slate-100 text-slate-700"
+          : "border-emerald-200 bg-emerald-50 text-emerald-900"
+      }`}
+    >
+      {undone ? (
+        <p>
+          Undone:{" "}
+          <Link href={billPath(id)} className="font-medium underline">
+            {number}
+          </Link>{" "}
+          is cancelled, and its cylinders are as they were before it.
+        </p>
+      ) : (
+        <Saved received={received} />
+      )}
+      {error && !undone && (
+        <p className="text-rose-700">
+          {error}{" "}
+          <Link href={billPath(id)} className="font-medium underline">
+            Open {number}
+          </Link>
+        </p>
+      )}
+      {offered && (
+        <button type="button" onClick={undo} disabled={undoing} className={buttonStyles.secondary}>
+          {undoing ? "Undoing…" : "Undo"}
+          <span className="sr-only"> {number}</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** How long after a save its Undo is offered. */
+const UNDO_MS = 10_000;
+
+/** Undo for a return just saved, which cancels it as a data entry error. */
+function useUndo(returnId: string, onTried: () => void) {
+  const [expired, setExpired] = useState(false);
+  const [undoing, startUndoing] = useTransition();
+  const [undone, setUndone] = useState(false);
+  const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    const timer = setTimeout(() => setExpired(true), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  function undo() {
+    setError(undefined);
+    startUndoing(async () => {
+      const outcome = await cancelBill(returnId, {
+        reason: "data_entry_error",
+        notes: null,
+      }).catch((): Outcome => ({
+        error: "The web app could not be reached. Check whether the return was cancelled.",
+      }));
+      setError(outcome.error);
+      setUndone(!outcome.error);
+      onTried();
+    });
+  }
+
+  // One already under way is shown through, however long it takes.
+  return { offered: !undone && (undoing || !expired), undoing, undone, error, undo };
+}
+
+function Saved({
   received: { id, number, customer, quantity, unmatched, bills },
 }: {
   received: ReceivedReturn;
 }) {
   const link = "font-medium underline";
-  const shown = useRef<HTMLParagraphElement>(null);
-
-  // The button that saved is at the foot of a form that may be long.
-  useEffect(() => {
-    shown.current?.scrollIntoView({ block: "nearest" });
-  }, [id]);
 
   return (
-    // The margin keeps it clear of the navigation bar, which stays at the top.
-    <p
-      ref={shown}
-      className="scroll-mt-20 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 wrap-anywhere"
-    >
+    <p>
       Saved{" "}
       <Link href={billPath(id)} className={link}>
         {number}

@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { dateSchema } from "./date";
+import { dateSchema, indianDate } from "./date";
 import { gasSchema } from "./gas";
 import { PARTY_TYPES } from "./party";
-import { queryPage } from "./query";
+import { optionalChoice, queryPage } from "./query";
+import type { Staff } from "./staff";
 import { optionalText, requiredText } from "./text";
 import { vehicleSchema } from "./vehicle";
 
@@ -47,7 +48,18 @@ export function pendingBillName({
   paperKind: PaperKind | null;
   number: string;
 }): string {
-  return paperKind ? `${PAPER_KIND_NAMES[paperKind]} ${number}` : "Opening stock";
+  return paperKind ? billName({ paperKind, number }) : "Opening stock";
+}
+
+/** What staff call one bill, such as "Cash memo 88", or its number if it was not on paper. */
+export function billName({
+  paperKind,
+  number,
+}: {
+  paperKind: PaperKind | null;
+  number: string;
+}): string {
+  return paperKind ? `${PAPER_KIND_NAMES[paperKind]} ${number}` : number;
 }
 
 /** A party as a bill names it, which may be the shop. */
@@ -109,6 +121,44 @@ export const billReturnsSchema = z.object({
 
 export type BillReturns = z.infer<typeof billReturnsSchema>;
 
+/** Only posted bills count. A cancelled bill stays to be read, and is never posted again. */
+export const billStatusSchema = z.enum(["posted", "cancelled"], "Choose posted or cancelled.");
+
+export type BillStatus = z.infer<typeof billStatusSchema>;
+
+export const CANCEL_REASONS = [
+  "data_entry_error",
+  "duplicate_entry",
+  "customer_rejected",
+  "wrong_cylinder_loaded",
+  "bill_voided",
+  "other",
+] as const;
+
+export const cancelReasonSchema = z.enum(CANCEL_REASONS, "Choose why the bill is cancelled.");
+
+export type CancelReason = z.infer<typeof cancelReasonSchema>;
+
+/** A cancellation as it is asked for. Which bill it is said beside this. */
+export const newCancellationSchema = z.object({
+  reason: cancelReasonSchema,
+  notes: optionalText({ max: 1000, tooLong: "Use notes of at most 1000 characters." }).default(
+    null,
+  ),
+});
+
+export type NewCancellation = z.infer<typeof newCancellationSchema>;
+
+/** Who cancelled a bill, when and why. */
+export const cancellationSchema = z.object({
+  reason: cancelReasonSchema,
+  notes: z.string().nullable(),
+  cancelledBy: billStaffSchema,
+  cancelledAt: z.iso.datetime(),
+});
+
+export type Cancellation = z.infer<typeof cancellationSchema>;
+
 /** A bill with everything on it. */
 export const billSchema = z.object({
   id: z.uuid(),
@@ -119,8 +169,9 @@ export const billSchema = z.object({
   date: dateSchema,
   /** The paper return slip's number, if one was noted on a return. */
   slipNumber: z.string().nullable(),
-  /** Only posted bills count. */
-  status: z.enum(["posted", "cancelled"]),
+  status: billStatusSchema,
+  /** Set on cancelled bills, and only on those. */
+  cancellation: cancellationSchema.nullable(),
   /** Whom the cylinders leave, or null when they join the business. */
   from: billPartySchema.nullable(),
   /** Who receives them, or null when they leave the business. */
@@ -131,19 +182,21 @@ export const billSchema = z.object({
   lines: z.array(billLineSchema),
   enteredBy: billStaffSchema,
   enteredAt: z.iso.datetime(),
-  /** Set on dispatch bills and customers' opening stock, and only on those. */
+  /** Set on posted dispatch bills and customers' opening stock, and only on those. */
   returns: billReturnsSchema.nullable(),
 });
 
 export type Bill = z.infer<typeof billSchema>;
 
 export const billListQuerySchema = z.object({
+  /** Narrows the list to the bills that count, or to those cancelled. */
+  status: optionalChoice(billStatusSchema),
   page: queryPage,
 });
 
 export type BillListQuery = z.infer<typeof billListQuerySchema>;
 
-/** One page of bills, the newest first. */
+/** One page of the bills asked for, the newest first. */
 export const billListSchema = z.object({
   bills: z.array(
     billSchema.pick({
@@ -158,7 +211,7 @@ export const billListSchema = z.object({
       lines: true,
     }),
   ),
-  /** How many bills there are, on every page together. */
+  /** How many such bills there are, on every page together. */
   total: z.int().nonnegative(),
   page: z.int().positive(),
   pageSize: z.int().positive(),
@@ -177,6 +230,34 @@ export const quantitySchema = z
   .int(WHOLE_NUMBER)
   .min(1, "Enter a quantity of 1 or more on each line.")
   .max(MOST_ON_A_LINE, "Enter at most 100000 on a line.");
+
+/**
+ * Why this person is not allowed to cancel the bill, or null if they are. Admins
+ * may cancel any bill. Staff may cancel only those they entered today, by the
+ * date in India, and no opening stock. The API holds everyone to this; the
+ * screens ask it too, to offer cancelling only to those allowed. Whether the bill
+ * itself can be cancelled is for the API to say.
+ */
+export function whyNotCancel(
+  {
+    type,
+    enteredBy,
+    enteredAt,
+  }: { type: BillType; enteredBy: { id: string }; enteredAt: string | Date },
+  staff: Pick<Staff, "id" | "isAdmin">,
+  today: string,
+): string | null {
+  if (staff.isAdmin) {
+    return null;
+  }
+  if (type === "opening_stock") {
+    return "Only an admin can cancel opening stock.";
+  }
+  if (enteredBy.id !== staff.id || indianDate(new Date(enteredAt)) !== today) {
+    return "You can cancel only bills you entered today. Ask an admin to cancel this one.";
+  }
+  return null;
+}
 
 /** One line of a bill as it is entered. */
 export const newBillLineSchema = z.object(

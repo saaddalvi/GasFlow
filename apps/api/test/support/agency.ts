@@ -230,6 +230,20 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     return matchedSchema.parse(response.json());
   }
 
+  /** Asks to cancel a bill, as the staff member unless told otherwise. */
+  const postCancel = (
+    bill: { id: string },
+    payload: object = { reason: "data_entry_error" },
+    { headers }: { headers: Record<string, string> } = staff,
+  ) => app.inject({ method: "POST", url: `/api/bills/${bill.id}/cancel`, headers, payload });
+
+  /** Cancels a bill as the admin, who may cancel any, expecting that to be done. */
+  async function cancel(bill: { id: string }, payload?: object) {
+    const response = await postCancel(bill, payload, admin);
+    expect(response.statusCode).toBe(200);
+    return billSchema.parse(response.json());
+  }
+
   /** What Receive empties lists for the customer on a date. */
   async function pending(customerId: string, date = "2026-11-26") {
     const response = await get(`/api/returns/pending?customerId=${customerId}&date=${date}`);
@@ -341,6 +355,8 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     receive,
     postMatch,
     match,
+    postCancel,
+    cancel,
     pending,
     askSplit,
     split,

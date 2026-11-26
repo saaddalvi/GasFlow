@@ -191,20 +191,22 @@ export async function listReturnCustomers(
 }
 
 /**
- * What has come back against a dispatch bill or a customer's opening stock, or
- * null for any other bill, on which nothing can be pending.
+ * What has come back against a posted dispatch bill or customer's opening stock,
+ * or null for any other bill, on which nothing can be pending.
  */
 export async function getBillReturns(
   db: Database,
   {
     id: billId,
     type,
+    status,
     toParty,
     lines,
-  }: Pick<Bill, "id" | "type" | "lines"> & { toParty: { type: string } | null },
+  }: Pick<Bill, "id" | "type" | "status" | "lines"> & { toParty: { type: string } | null },
 ): Promise<BillReturns | null> {
   // The same bills as CLEARABLE_LINES.
-  if (!(type === "dispatch" || type === "opening_stock") || toParty?.type !== "customer") {
+  const sends = type === "dispatch" || type === "opening_stock";
+  if (!sends || status !== "posted" || toParty?.type !== "customer") {
     return null;
   }
   const allocations = await db.allocation.findMany({

@@ -3,6 +3,7 @@ import { requireSignIn } from "./auth";
 import type { Clock } from "./clock";
 import type { Database } from "./database";
 import type { IdentityProvider } from "./identity";
+import { BlockedRefusal } from "./refusal";
 import { billRoutes } from "./routes/bills";
 import { gasRoutes } from "./routes/gases";
 import { meRoutes } from "./routes/me";
@@ -25,6 +26,15 @@ export interface AppDependencies {
 
 export function buildApp(dependencies: AppDependencies, options: FastifyServerOptions = {}) {
   const app = Fastify(options);
+  // The usual answer to an error says why, but leaves out which bills are to blame.
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof BlockedRefusal) {
+      const { message, blockingBills } = error;
+      return reply.code(error.statusCode).send({ message, blockingBills });
+    }
+    // Answered as usual.
+    return reply.send(error);
+  });
   requireSignIn(app, dependencies);
   billRoutes(app, dependencies);
   gasRoutes(app, dependencies);

@@ -137,10 +137,15 @@ In the API:
   `src/identity.ts`; the real one is `src/clerk-identity.ts`.
 - Only the bill ledger, `src/services/ledger.ts`, changes bills and
   allocations. Each of its operations checks the rules and writes in one
-  transaction. One that creates an allocation first locks the customer, so that
-  two saves cannot use the same pending cylinders. The database keeps bill
-  numbers unique on each paper kind, and a refiller's slip numbers unique for
-  that refiller, ignoring cancelled bills.
+  transaction. One that creates an allocation, or cancels a bill, first locks the
+  customer (or whichever party the bill names), so that two saves cannot use the
+  same pending cylinders, or return against a bill as it is cancelled. The
+  database keeps bill numbers unique on each paper kind, and a refiller's slip
+  numbers unique for that refiller, ignoring cancelled bills.
+- Bills are never deleted, and a cancelled one is never posted again. Everything
+  that counts cylinders reads posted bills only. Who may cancel a bill is decided
+  by `whyNotCancel` in `packages/shared`, which the screens ask too, so that they
+  offer nothing the API would refuse.
 - Reports only read. They work every figure out from posted bills, and no stock
   count is stored. Pending cylinders are likewise worked out, by
   `src/services/pending.ts`, from the allocations of posted returns. Unmatched
@@ -149,7 +154,8 @@ In the API:
 - A calendar date is text such as `2026-11-26`; `src/database-date.ts` converts
   it for the database.
 - To turn a request down, throw a `Refusal` from `src/refusal.ts` with the status
-  and a message fit to show the person. Check request bodies and query strings
+  and a message fit to show the person, or a `BlockedRefusal` to name the bills
+  that stand in the way. Check request bodies and query strings
   with `parseRequest`. The forms check what was typed against the same schemas
   first, with `checkInput` from `packages/shared`.
 - Parties, vehicles and gases are never deleted: they are made inactive (a gas is

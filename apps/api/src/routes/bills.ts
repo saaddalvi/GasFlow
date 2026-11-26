@@ -5,6 +5,7 @@ import {
   billNumberUseSchema,
   billSchema,
   newBillSchema,
+  newCancellationSchema,
   refillerRefillerSlipNumberUseQuerySchema,
 } from "@gasflow/shared";
 import type { FastifyInstance } from "fastify";
@@ -17,7 +18,7 @@ import {
   listBills,
   noSuchBill,
 } from "../services/bills";
-import { enterBill } from "../services/ledger";
+import { cancelBill, enterBill } from "../services/ledger";
 import { idParam } from "./id-param";
 
 /** Every staff member reads bills and enters those copied from paper. */
@@ -47,4 +48,12 @@ export function billRoutes(app: FastifyInstance, { db, clock }: AppDependencies)
   app.get("/api/bills/:billId", async (request) =>
     billSchema.parse(await getBill(db, idParam(request, "billId", noSuchBill))),
   );
+
+  // Who may cancel which bill is the ledger's to say.
+  app.post("/api/bills/:billId/cancel", async (request) => {
+    const billId = idParam(request, "billId", noSuchBill);
+    const cancellation = parseRequest(newCancellationSchema, request.body);
+    await cancelBill(db, clock, request.staff, billId, cancellation);
+    return billSchema.parse(await getBill(db, billId));
+  });
 }

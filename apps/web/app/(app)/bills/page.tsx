@@ -1,15 +1,23 @@
 import { auth } from "@clerk/nextjs/server";
-import { billListQuerySchema, type BillList } from "@gasflow/shared";
+import {
+  billListQuerySchema,
+  billStatusSchema,
+  type BillList,
+  type BillListQuery,
+} from "@gasflow/shared";
 import type { Metadata } from "next";
+import Form from "next/form";
 import Link from "next/link";
 import { BillStatusTag } from "@/components/bill-status-tag";
 import { buttonStyles } from "@/components/button-styles";
 import { EmptyState } from "@/components/empty-state";
+import { SelectField } from "@/components/fields";
 import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyPage, Pagination } from "@/components/pagination";
 import { fetchBills, orNull } from "@/lib/api";
-import { describeBillType, quantitiesByGas } from "@/lib/bill-names";
+import { BILL_STATUS_NAMES, describeBillType, quantitiesByGas } from "@/lib/bill-names";
+import { billListSearch } from "@/lib/bill-list-search";
 import { formatDate } from "@/lib/dates";
 import { billPath, BILLS_PATH, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
 
@@ -25,11 +33,12 @@ export default async function BillsPage({
   await auth.protect();
   // An address typed by hand that asks for nonsense gets the first page.
   const asked = billListQuerySchema.safeParse(await searchParams);
-  const list = await orNull(fetchBills(asked.data ?? billListQuerySchema.parse({})));
+  const query = asked.data ?? billListQuerySchema.parse({});
+  const list = await orNull(fetchBills(query));
 
   return (
     <div className="space-y-6">
-      <PageHeading title="Bills" subtitle="Every bill, the newest date first.">
+      <PageHeading title="Bills" subtitle="The newest date first.">
         <div className="flex flex-wrap gap-2">
           <Link href={OPENING_STOCK_PATH} className={buttonStyles.secondary}>
             Opening stock
@@ -39,8 +48,10 @@ export default async function BillsPage({
           </Link>
         </div>
       </PageHeading>
+      {/* Starts afresh when the address changes, so that the box matches it. */}
+      <Filters key={billListSearch(query)} query={query} />
       {list ? (
-        <Results list={list} />
+        <Results list={list} query={query} />
       ) : (
         <LoadError>
           The bills could not be loaded. Check that the API is running, then reload the page.
@@ -50,10 +61,46 @@ export default async function BillsPage({
   );
 }
 
-function Results({ list: { bills, total, page, pageSize } }: { list: BillList }) {
-  const pageHref = (to: number) => `${BILLS_PATH}?page=${to}`;
+/** Narrows the list. What is chosen goes into the address. */
+function Filters({ query }: { query: BillListQuery }) {
+  return (
+    <Form action={BILLS_PATH} className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="grid items-end gap-4 sm:grid-cols-[minmax(0,14rem)_auto] sm:justify-start">
+        <SelectField label="Status" name="status" defaultValue={query.status ?? ""}>
+          <option value="">All bills</option>
+          {billStatusSchema.options.map((status) => (
+            <option key={status} value={status}>
+              {BILL_STATUS_NAMES[status]}
+            </option>
+          ))}
+        </SelectField>
+        <div className="flex items-center gap-3">
+          <button type="submit" className={buttonStyles.secondary}>
+            Show
+          </button>
+          <Link href={BILLS_PATH} className="text-sm text-slate-500 hover:text-slate-700">
+            Reset
+          </Link>
+        </div>
+      </div>
+    </Form>
+  );
+}
+
+function Results({
+  list: { bills, total, page, pageSize },
+  query,
+}: {
+  list: BillList;
+  query: BillListQuery;
+}) {
+  const pageHref = (to: number) => `${BILLS_PATH}?${billListSearch({ ...query, page: to })}`;
   if (total === 0) {
-    return <EmptyState>No bills have been entered yet.</EmptyState>;
+    return (
+      <EmptyState>
+        {query.status ? `No bills are ${query.status}.` : "No bills have been entered yet."}
+      </EmptyState>
+    );
   }
   if (bills.length === 0) {
     return <EmptyPage firstPageHref={pageHref(1)} />;

@@ -26,6 +26,7 @@ import {
   type BillListQuery,
   type BillNumberUse,
   type BillNumberUseQuery,
+  type BlockingBill,
   type ClosedRowList,
   type ClosedRowListQuery,
   type Split,
@@ -53,6 +54,7 @@ import {
   type VehicleList,
 } from "@gasflow/shared";
 import { refresh } from "next/cache";
+import { billListSearch } from "./bill-list-search";
 import { partyListSearch } from "./party-list-search";
 
 // Everything here runs on the web server, never in the browser, and asks the API
@@ -79,8 +81,8 @@ export async function fetchBill(billId: string): Promise<Bill | undefined> {
   return found === undefined ? undefined : billSchema.parse(found);
 }
 
-export async function fetchBills({ page }: BillListQuery): Promise<BillList> {
-  return billListSchema.parse(await getJson(`/api/bills?page=${page}`));
+export async function fetchBills(query: BillListQuery): Promise<BillList> {
+  return billListSchema.parse(await getJson(`/api/bills?${billListSearch(query)}`));
 }
 
 /** Which bill, if any, already has this number on this paper kind. */
@@ -181,6 +183,8 @@ export async function fetchStaff(): Promise<StaffList> {
 /** How a change went: why it was not made, or where to go now that it is. */
 export interface Outcome {
   error?: string;
+  /** The bills that stand in the way, when that is why it was not made. */
+  blockingBills?: BlockingBill[];
   goTo?: string;
 }
 
@@ -217,7 +221,8 @@ async function askForChange(
     }
     // A refusal says why, in words for the person. A server error does not.
     if (response.status < 500) {
-      return { error: refusalSchema.parse(await response.json()).message };
+      const { message, blockingBills } = refusalSchema.parse(await response.json());
+      return { error: message, blockingBills };
     }
     console.error(`The API answered ${response.status} for ${method} ${path}.`);
   } catch (error) {

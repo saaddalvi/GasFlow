@@ -1,5 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
-import { PAPER_KIND_NAMES, type Bill, type BillParty } from "@gasflow/shared";
+import {
+  billName,
+  PAPER_KIND_NAMES,
+  whyNotCancel,
+  type Bill,
+  type BillParty,
+  type Cancellation,
+} from "@gasflow/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,12 +14,13 @@ import { BillStatusTag } from "@/components/bill-status-tag";
 import { buttonStyles } from "@/components/button-styles";
 import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
-import { fetchBill, orNull } from "@/lib/api";
-import { BILL_TYPE_NAMES, FILL_STATE_NAMES } from "@/lib/bill-names";
+import { fetchBill, fetchMe, fetchToday, orNull } from "@/lib/api";
+import { BILL_TYPE_NAMES, CANCEL_REASON_NAMES, FILL_STATE_NAMES } from "@/lib/bill-names";
 import { formatDate, formatMoment } from "@/lib/dates";
 import { BILL_PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { BILLS_PATH, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
 import { vehicleName } from "@/lib/vehicle-names";
+import { CancelBill } from "./cancel-bill";
 import { Returns } from "./returns";
 
 export const metadata: Metadata = {
@@ -22,7 +30,11 @@ export const metadata: Metadata = {
 export default async function BillPage({ params }: { params: Promise<{ billId: string }> }) {
   await auth.protect();
   const { billId } = await params;
-  const bill = await orNull(fetchBill(billId));
+  const [bill, me, today] = await Promise.all([
+    orNull(fetchBill(billId)),
+    orNull(fetchMe()),
+    orNull(fetchToday()),
+  ]);
   if (bill === undefined) {
     notFound();
   }
@@ -33,6 +45,11 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       </LoadError>
     );
   }
+
+  // Offered on a posted bill to those allowed to cancel it.
+  const offerCancel = Boolean(
+    bill.status === "posted" && me && today && whyNotCancel(bill, me, today) === null,
+  );
 
   return (
     <div className="space-y-8">
@@ -59,9 +76,13 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
           </Link>
         </div>
       </PageHeading>
+      {bill.cancellation && <Cancelled cancellation={bill.cancellation} />}
       <Details bill={bill} />
       <Lines lines={bill.lines} />
       {bill.returns && <Returns returns={bill.returns} />}
+      {/* Always here, so that a refusal stays up when it is no longer offered. Keyed,
+          so that nothing typed on one bill is left on the next. */}
+      <CancelBill key={bill.id} billId={bill.id} name={billName(bill)} offered={offerCancel} />
     </div>
   );
 }
@@ -71,19 +92,56 @@ function Details({
 }: {
   bill: Bill;
 }) {
-  const details = [
-    ["Paper kind", paperKind && PAPER_KIND_NAMES[paperKind]],
-    ["Slip number", slipNumber],
-    ["From", from && <PartyName party={from} />],
-    // Opening stock names only the party that held it.
-    [from ? "To" : "Party", to && <PartyName party={to} />],
-    ["Vehicle", vehicle && vehicleName(vehicle)],
-    // Kept on the lines it was typed on.
-    ["Notes", notes && <span className="whitespace-pre-line">{notes}</span>],
-    ["Entered by", enteredBy.displayName],
-    ["Entered at", formatMoment(enteredAt)],
-  ] as const;
+  return (
+    <DetailList
+      details={[
+        ["Paper kind", paperKind && PAPER_KIND_NAMES[paperKind]],
+        ["Slip number", slipNumber],
+        ["From", from && <PartyName party={from} />],
+        // Opening stock names only the party that held it.
+        [from ? "To" : "Party", to && <PartyName party={to} />],
+        ["Vehicle", vehicle && vehicleName(vehicle)],
+        ["Notes", notes && <Typed text={notes} />],
+        ["Entered by", enteredBy.displayName],
+        ["Entered at", formatMoment(enteredAt)],
+      ]}
+    />
+  );
+}
 
+/** Who cancelled the bill, when and why. */
+function Cancelled({
+  cancellation: { reason, notes, cancelledBy, cancelledAt },
+}: {
+  cancellation: Cancellation;
+}) {
+  return (
+    <section aria-labelledby="cancelled-heading" className="space-y-3">
+      <div>
+        <h2 id="cancelled-heading" className="text-lg font-semibold">
+          Cancelled
+        </h2>
+        <p className="text-sm text-slate-500">This bill counts towards no figure.</p>
+      </div>
+      <DetailList
+        details={[
+          ["Reason", CANCEL_REASON_NAMES[reason]],
+          ["Cancellation notes", notes && <Typed text={notes} />],
+          ["Cancelled by", cancelledBy.displayName],
+          ["Cancelled at", formatMoment(cancelledAt)],
+        ]}
+      />
+    </section>
+  );
+}
+
+/** Text kept on the lines it was typed on. */
+function Typed({ text }: { text: string }) {
+  return <span className="whitespace-pre-line">{text}</span>;
+}
+
+/** Labelled facts, leaving out those the bill has nothing for. */
+function DetailList({ details }: { details: [label: string, value: React.ReactNode][] }) {
   return (
     <dl className="max-w-2xl divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
       {details.map(

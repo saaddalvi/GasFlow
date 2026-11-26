@@ -30,32 +30,49 @@ export async function getBill(db: Database, billId: string): Promise<Bill> {
       notes: true,
       enteredBy: { select: STAFF },
       enteredAt: true,
+      cancelReason: true,
+      cancelNotes: true,
+      cancelledBy: { select: STAFF },
+      cancelledAt: true,
     },
   });
   if (!bill) {
     throw noSuchBill();
   }
-  const { enteredAt, ...rest } = bill;
+  const { enteredAt, cancelReason, cancelNotes, cancelledBy, cancelledAt, ...rest } = bill;
   return {
     ...asReported(rest),
     enteredAt: enteredAt.toISOString(),
+    // A cancelled bill has a reason, someone who gave it and a time, by a check
+    // in the database. No other bill has any of them.
+    cancellation:
+      rest.status === "cancelled"
+        ? {
+            reason: cancelReason!,
+            notes: cancelNotes,
+            cancelledBy: cancelledBy!,
+            cancelledAt: cancelledAt!.toISOString(),
+          }
+        : null,
     returns: await getBillReturns(db, bill),
   };
 }
 
-/** One page of all the bills, the newest first. */
-export async function listBills(db: Database, { page }: BillListQuery) {
+/** One page of the bills, of either status unless one is asked for, the newest first. */
+export async function listBills(db: Database, { status, page }: BillListQuery) {
+  const where = { status };
   // Not in a transaction, whose one connection cannot run the queries for a
   // bill's parties and lines side by side.
   const [bills, total] = await Promise.all([
     db.bill.findMany({
+      where,
       select: SUMMARY,
       // The id keeps bills entered at one moment in the same order on every page.
       orderBy: [{ date: "desc" }, { enteredAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
-    db.bill.count(),
+    db.bill.count({ where }),
   ]);
   return { bills: bills.map(asReported), total, page, pageSize: PAGE_SIZE };
 }

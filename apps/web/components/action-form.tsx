@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 import type { Outcome } from "@/lib/api";
+import { billPath } from "@/lib/routes";
 import { buttonStyles } from "./button-styles";
 
 export interface ActionFormProps {
@@ -12,6 +14,8 @@ export interface ActionFormProps {
   /** For a change that takes something away. */
   danger?: boolean;
   onCancel?: () => void;
+  /** The words on the button that gives up, where "Cancel" would be unclear. */
+  cancelLabel?: string;
   onDone?: () => void;
   children?: React.ReactNode;
 }
@@ -26,10 +30,12 @@ export function ActionForm({
   submitLabel,
   danger,
   onCancel,
+  cancelLabel = "Cancel",
   onDone,
   children,
 }: ActionFormProps) {
-  const [error, setError] = useState<string>();
+  // Why the last try was refused, if it was.
+  const [refusal, setRefusal] = useState<Outcome>();
   const [changesMade, setChangesMade] = useState(0);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -38,12 +44,12 @@ export function ActionForm({
   function submit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    setError(undefined);
+    setRefusal(undefined);
     startTransition(async () => {
       const outcome = await action(form).catch((): Outcome => ({
         error: "The web app could not be reached. Check your connection and try again.",
       }));
-      setError(outcome.error);
+      setRefusal(outcome.error ? outcome : undefined);
       const { goTo } = outcome;
       if (goTo) {
         // The button stays disabled until the next page is up.
@@ -63,22 +69,33 @@ export function ActionForm({
       onSubmit={submit}
       // The browser stops a form with an invalid field before it is sent, and points
       // at the field. What was said about an earlier try goes.
-      onInvalidCapture={() => setError(undefined)}
+      onInvalidCapture={() => setRefusal(undefined)}
       className="space-y-4"
     >
       <Fragment key={changesMade}>{children}</Fragment>
-      {error && (
-        <p
+      {refusal && (
+        <div
           role="alert"
           className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
         >
-          {error}
-        </p>
+          <p>{refusal.error}</p>
+          {refusal.blockingBills && (
+            <ul className="mt-1 flex flex-wrap gap-x-3">
+              {refusal.blockingBills.map(({ id, number }) => (
+                <li key={id}>
+                  <Link href={billPath(id)} className="inline-block py-1 font-medium underline">
+                    {number}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
       <div className="flex justify-end gap-2">
         {onCancel && (
           <button type="button" onClick={onCancel} className={buttonStyles.secondary}>
-            Cancel
+            {cancelLabel}
           </button>
         )}
         <button
