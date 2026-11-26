@@ -159,19 +159,12 @@ export const cancellationSchema = z.object({
 
 export type Cancellation = z.infer<typeof cancellationSchema>;
 
-/** A bill with everything on it. */
-export const billSchema = z.object({
-  id: z.uuid(),
-  type: billTypeSchema,
+/** What a bill says that a correction can change. */
+export const billContentSchema = z.object({
   /** Set on bills numbered from the agency's own paper, and only on those. */
   paperKind: paperKindSchema.nullable(),
   number: z.string().min(1),
   date: dateSchema,
-  /** The paper return slip's number, if one was noted on a return. */
-  slipNumber: z.string().nullable(),
-  status: billStatusSchema,
-  /** Set on cancelled bills, and only on those. */
-  cancellation: cancellationSchema.nullable(),
   /** Whom the cylinders leave, or null when they join the business. */
   from: billPartySchema.nullable(),
   /** Who receives them, or null when they leave the business. */
@@ -180,6 +173,36 @@ export const billSchema = z.object({
   vehicle: vehicleSchema.pick({ id: true, plate: true, label: true }).nullable(),
   notes: z.string().nullable(),
   lines: z.array(billLineSchema),
+});
+
+export type BillContent = z.infer<typeof billContentSchema>;
+
+/**
+ * A version of a bill that a correction has since replaced, as it read then, with
+ * who entered or corrected the bill to read so, and when.
+ */
+export const billVersionSchema = billContentSchema.extend({
+  savedBy: billStaffSchema,
+  savedAt: z.iso.datetime(),
+});
+
+export type BillVersion = z.infer<typeof billVersionSchema>;
+
+/** A bill with everything on it. */
+export const billSchema = billContentSchema.extend({
+  id: z.uuid(),
+  type: billTypeSchema,
+  /** The paper return slip's number, if one was noted on a return. */
+  slipNumber: z.string().nullable(),
+  status: billStatusSchema,
+  /** Set on cancelled bills, and only on those. */
+  cancellation: cancellationSchema.nullable(),
+  /** Who made the bill read as it does now, if it has been corrected, and when. */
+  lastCorrection: z
+    .object({ correctedBy: billStaffSchema, correctedAt: z.iso.datetime() })
+    .nullable(),
+  /** What it said before each correction, the oldest first. Empty if never corrected. */
+  earlierVersions: z.array(billVersionSchema),
   enteredBy: billStaffSchema,
   enteredAt: z.iso.datetime(),
   /** Set on posted dispatch bills and customers' opening stock, and only on those. */
@@ -238,23 +261,62 @@ export const quantitySchema = z
  * screens ask it too, to offer cancelling only to those allowed. Whether the bill
  * itself can be cancelled is for the API to say.
  */
-export function whyNotCancel(
-  {
-    type,
-    enteredBy,
-    enteredAt,
-  }: { type: BillType; enteredBy: { id: string }; enteredAt: string | Date },
-  staff: Pick<Staff, "id" | "isAdmin">,
+export function whyNotCancel(bill: Entered, staff: Asker, today: string): string | null {
+  return whyNotChange("cancel", bill, staff, today);
+}
+
+/**
+ * Why this person is not allowed to correct the bill, or null if they are. The
+ * rule is the one for cancelling, and is used the same way. Whether anyone can
+ * correct the bill is for whyUncorrectable to say.
+ */
+export function whyNotCorrect(bill: Entered, staff: Asker, today: string): string | null {
+  return whyNotChange("correct", bill, staff, today);
+}
+
+/**
+ * Why nobody can correct the bill, whoever they are, or null if it can be
+ * corrected. The API and the screens both say so in these words.
+ */
+export function whyUncorrectable({
+  type,
+  status,
+}: {
+  type: BillType;
+  status: BillStatus;
+}): string | null {
+  if (type === "return_from_customer") {
+    return "A return cannot be corrected. Cancel it and record it again.";
+  }
+  if (status === "cancelled") {
+    return "This bill has been cancelled, so it cannot be corrected.";
+  }
+  return null;
+}
+
+/** Who entered a bill and when, which with its type decides who may change it. */
+interface Entered {
+  type: BillType;
+  enteredBy: { id: string };
+  enteredAt: string | Date;
+}
+
+type Asker = Pick<Staff, "id" | "isAdmin">;
+
+function whyNotChange(
+  change: "cancel" | "correct",
+  { type, enteredBy, enteredAt }: Entered,
+  staff: Asker,
   today: string,
 ): string | null {
   if (staff.isAdmin) {
     return null;
   }
   if (type === "opening_stock") {
-    return "Only an admin can cancel opening stock.";
+    return `Only an admin can ${change} opening stock.`;
   }
   if (enteredBy.id !== staff.id || indianDate(new Date(enteredAt)) !== today) {
-    return "You can cancel only bills you entered today. Ask an admin to cancel this one.";
+    return `You can ${change} only bills you entered today. Ask an admin to ${change} this one.`;
   }
   return null;
 }
@@ -262,7 +324,8 @@ export function whyNotCancel(
 /** One line of a bill as it is entered. */
 export const newBillLineSchema = z.object(
   {
-    gasId: z.uuid("Choose a gas on each line."),
+    // In small letters, as the database gives ids back, so that they can be matched.
+    gasId: z.uuid("Choose a gas on each line.").toLowerCase(),
     fillState: fillStateSchema,
     quantity: quantitySchema,
   },
@@ -285,12 +348,12 @@ export const billNumberSchema = requiredText({
 
 const CHOOSE_TYPE = "Choose the type of bill.";
 
-const refillerIdSchema = z.uuid("Choose a refiller.");
+const refillerIdSchema = z.uuid("Choose a refiller.").toLowerCase();
 
 /** What every bill entered from paper says, besides its number and its party. */
 const paperFields = {
   date: z.iso.date("Choose the bill date."),
-  vehicleId: z.uuid("Choose a vehicle from the list.").nullable().default(null),
+  vehicleId: z.uuid("Choose a vehicle from the list.").toLowerCase().nullable().default(null),
   notes: optionalText({ max: 1000, tooLong: "Use notes of at most 1000 characters." }).default(
     null,
   ),
@@ -305,7 +368,7 @@ export const newDispatchSchema = z.object({
   type: z.literal("dispatch", CHOOSE_TYPE),
   paperKind: paperKindSchema,
   number: billNumberSchema,
-  customerId: z.uuid("Choose a customer."),
+  customerId: z.uuid("Choose a customer.").toLowerCase(),
   ...paperFields,
 });
 
@@ -350,6 +413,29 @@ export const newBillSchema = z.discriminatedUnion(
 );
 
 export type NewBill = z.infer<typeof newBillSchema>;
+
+/** Opening stock as it is corrected. Its party, date and number stay as they are. */
+export const openingStockCorrectionSchema = z.object({
+  type: z.literal("opening_stock", CHOOSE_TYPE),
+  lines: newBillLinesSchema,
+});
+
+/**
+ * A posted bill as it is to read once corrected, which is all of it again. Its
+ * type cannot change, and a return from a customer is never corrected.
+ */
+export const billCorrectionSchema = z.discriminatedUnion(
+  "type",
+  [
+    newDispatchSchema,
+    newSendToRefillerSchema,
+    newReturnFromRefillerSchema,
+    openingStockCorrectionSchema,
+  ],
+  CHOOSE_TYPE,
+);
+
+export type BillCorrection = z.infer<typeof billCorrectionSchema>;
 
 /** Asks whether a number is taken, while it is being typed. */
 export const billNumberUseQuerySchema = z.object({

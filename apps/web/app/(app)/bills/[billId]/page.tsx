@@ -3,8 +3,9 @@ import {
   billName,
   PAPER_KIND_NAMES,
   whyNotCancel,
+  whyNotCorrect,
+  whyUncorrectable,
   type Bill,
-  type BillParty,
   type Cancellation,
 } from "@gasflow/shared";
 import type { Metadata } from "next";
@@ -14,14 +15,15 @@ import { BillStatusTag } from "@/components/bill-status-tag";
 import { buttonStyles } from "@/components/button-styles";
 import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
+import { Tag } from "@/components/tag";
 import { fetchBill, fetchMe, fetchToday, orNull } from "@/lib/api";
-import { BILL_TYPE_NAMES, CANCEL_REASON_NAMES, FILL_STATE_NAMES } from "@/lib/bill-names";
+import { BILL_TYPE_NAMES, CANCEL_REASON_NAMES } from "@/lib/bill-names";
 import { formatDate, formatMoment } from "@/lib/dates";
-import { BILL_PARTY_TYPE_NAMES } from "@/lib/party-types";
-import { BILLS_PATH, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
-import { vehicleName } from "@/lib/vehicle-names";
+import { BILLS_PATH, correctBillPath, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
+import { DetailList, Lines, movementDetails, Typed } from "./bill-parts";
 import { CancelBill } from "./cancel-bill";
 import { Returns } from "./returns";
+import { Versions } from "./versions";
 
 export const metadata: Metadata = {
   title: "Bill · GasFlow",
@@ -46,9 +48,11 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
     );
   }
 
-  // Offered on a posted bill to those allowed to cancel it.
-  const offerCancel = Boolean(
-    bill.status === "posted" && me && today && whyNotCancel(bill, me, today) === null,
+  // Each is offered on a posted bill to those allowed to do it.
+  const posted = bill.status === "posted" && me && today ? { me, today } : null;
+  const offerCancel = Boolean(posted && whyNotCancel(bill, posted.me, posted.today) === null);
+  const offerCorrect = Boolean(
+    posted && !whyUncorrectable(bill) && !whyNotCorrect(bill, posted.me, posted.today),
   );
 
   return (
@@ -59,6 +63,7 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
           <span className="flex flex-wrap items-center gap-2">
             {BILL_TYPE_NAMES[bill.type]} · {formatDate(bill.date)}
             <BillStatusTag status={bill.status} />
+            {bill.lastCorrection && <Tag colour="amber">Edited</Tag>}
           </span>
         }
       >
@@ -71,6 +76,11 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
           <Link href={BILLS_PATH} className="text-sm text-brand-700 hover:underline">
             All bills
           </Link>
+          {offerCorrect && (
+            <Link href={correctBillPath(bill.id)} className={buttonStyles.secondary}>
+              Correct bill
+            </Link>
+          )}
           <Link href={NEW_BILL_PATH} className={buttonStyles.secondary}>
             + New bill
           </Link>
@@ -80,6 +90,9 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       <Details bill={bill} />
       <Lines lines={bill.lines} />
       {bill.returns && <Returns returns={bill.returns} />}
+      {bill.lastCorrection && (
+        <Versions earlier={bill.earlierVersions} lastCorrection={bill.lastCorrection} />
+      )}
       {/* Always here, so that a refusal stays up when it is no longer offered. Keyed,
           so that nothing typed on one bill is left on the next. */}
       <CancelBill key={bill.id} billId={bill.id} name={billName(bill)} offered={offerCancel} />
@@ -87,21 +100,15 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
   );
 }
 
-function Details({
-  bill: { paperKind, slipNumber, from, to, vehicle, notes, enteredBy, enteredAt },
-}: {
-  bill: Bill;
-}) {
+function Details({ bill }: { bill: Bill }) {
+  const { paperKind, slipNumber, enteredBy, enteredAt } = bill;
+
   return (
     <DetailList
       details={[
         ["Paper kind", paperKind && PAPER_KIND_NAMES[paperKind]],
         ["Slip number", slipNumber],
-        ["From", from && <PartyName party={from} />],
-        // Opening stock names only the party that held it.
-        [from ? "To" : "Party", to && <PartyName party={to} />],
-        ["Vehicle", vehicle && vehicleName(vehicle)],
-        ["Notes", notes && <Typed text={notes} />],
+        ...movementDetails(bill),
         ["Entered by", enteredBy.displayName],
         ["Entered at", formatMoment(enteredAt)],
       ]}
@@ -132,84 +139,5 @@ function Cancelled({
         ]}
       />
     </section>
-  );
-}
-
-/** Text kept on the lines it was typed on. */
-function Typed({ text }: { text: string }) {
-  return <span className="whitespace-pre-line">{text}</span>;
-}
-
-/** Labelled facts, leaving out those the bill has nothing for. */
-function DetailList({ details }: { details: [label: string, value: React.ReactNode][] }) {
-  return (
-    <dl className="max-w-2xl divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-      {details.map(
-        ([label, value]) =>
-          value && (
-            <div key={label} className="grid gap-1 px-5 py-3 text-sm sm:grid-cols-[10rem_1fr]">
-              <dt className="text-slate-500">{label}</dt>
-              <dd className="wrap-anywhere">{value}</dd>
-            </div>
-          ),
-      )}
-    </dl>
-  );
-}
-
-/** A party's name and type, linked to its page. The shop has none. */
-function PartyName({ party: { id, name, type } }: { party: BillParty }) {
-  return (
-    <>
-      {type === "shop" ? (
-        name
-      ) : (
-        <Link href={`/parties/${id}`} className="text-brand-700 hover:underline">
-          {name}
-        </Link>
-      )}{" "}
-      <span className="text-slate-500">({BILL_PARTY_TYPE_NAMES[type]})</span>
-    </>
-  );
-}
-
-function Lines({ lines }: { lines: Bill["lines"] }) {
-  const total = lines.reduce((sum, line) => sum + line.quantity, 0);
-
-  return (
-    <div className="max-w-2xl overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
-          <tr>
-            <th scope="col" className="px-5 py-3 font-semibold">
-              Gas
-            </th>
-            <th scope="col" className="px-3 py-3 font-semibold">
-              Fill state
-            </th>
-            <th scope="col" className="px-5 py-3 text-right font-semibold">
-              Quantity
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {lines.map((line) => (
-            <tr key={line.id}>
-              <td className="px-5 py-3">{line.gas.name}</td>
-              <td className="px-3 py-3">{FILL_STATE_NAMES[line.fillState]}</td>
-              <td className="px-5 py-3 text-right tabular-nums">{line.quantity}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot className="border-t border-slate-200 font-semibold">
-          <tr>
-            <th scope="row" colSpan={2} className="px-5 py-3">
-              Total
-            </th>
-            <td className="px-5 py-3 text-right tabular-nums">{total}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  billCorrectionSchema,
   billListQuerySchema,
   billListSchema,
   billNumberUseQuerySchema,
@@ -18,7 +19,7 @@ import {
   listBills,
   noSuchBill,
 } from "../services/bills";
-import { cancelBill, enterBill } from "../services/ledger";
+import { cancelBill, correctBill, enterBill } from "../services/ledger";
 import { idParam } from "./id-param";
 
 /** Every staff member reads bills and enters those copied from paper. */
@@ -49,7 +50,14 @@ export function billRoutes(app: FastifyInstance, { db, clock }: AppDependencies)
     billSchema.parse(await getBill(db, idParam(request, "billId", noSuchBill))),
   );
 
-  // Who may cancel which bill is the ledger's to say.
+  // Who may correct or cancel which bill is the ledger's to say.
+  app.put("/api/bills/:billId", async (request) => {
+    const billId = idParam(request, "billId", noSuchBill);
+    const correction = parseRequest(billCorrectionSchema, request.body);
+    await correctBill(db, clock, request.staff, billId, correction);
+    return billSchema.parse(await getBill(db, billId));
+  });
+
   app.post("/api/bills/:billId/cancel", async (request) => {
     const billId = idParam(request, "billId", noSuchBill);
     const cancellation = parseRequest(newCancellationSchema, request.body);

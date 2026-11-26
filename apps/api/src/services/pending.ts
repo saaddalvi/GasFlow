@@ -81,6 +81,38 @@ export function findClearableLines(
   `;
 }
 
+/** The part of a posted return that is matched to one line of a bill. */
+export interface AllocationToBill {
+  clearingLineId: string;
+  clearedLineId: string;
+  quantity: number;
+  /** The gas of both lines. */
+  gasId: string;
+  gasName: string;
+  returnId: string;
+  returnNumber: string;
+  returnDate: Date;
+}
+
+/** What posted returns have matched to the lines of the bill, the oldest return first. */
+export function findAllocationsToBill(
+  tx: Transaction,
+  billId: string,
+): Promise<AllocationToBill[]> {
+  return tx.$queryRaw<AllocationToBill[]>`
+    SELECT a.clearing_line_id AS "clearingLineId", a.cleared_line_id AS "clearedLineId",
+           a.quantity, l.gas_id AS "gasId", g.name::text AS "gasName",
+           rb.id AS "returnId", rb.number::text AS "returnNumber", rb.date AS "returnDate"
+      FROM allocations a
+      JOIN bill_lines l ON l.id = a.cleared_line_id
+      JOIN gases g ON g.id = l.gas_id
+      JOIN bill_lines r ON r.id = a.clearing_line_id
+      JOIN bills rb ON rb.id = r.bill_id
+     WHERE l.bill_id = ${billId}::uuid AND rb.status = 'posted'
+     ORDER BY rb.date, rb.entered_at, rb.id, l.line_no
+  `;
+}
+
 /** What the customer can return cylinders against on the date. */
 export async function listPending(
   db: Database,

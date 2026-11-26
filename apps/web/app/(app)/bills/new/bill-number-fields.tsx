@@ -23,6 +23,7 @@ export function BillNumberFields({
   onPaperKind,
   onNumber,
   askAgain,
+  ownBillId,
 }: {
   paperKind: PaperKind;
   number: string;
@@ -30,9 +31,11 @@ export function BillNumberFields({
   onNumber: (number: string) => void;
   /** Changes when the number should be looked up again. */
   askAgain: number;
+  /** The bill being corrected, whose own number is no cause for warning. */
+  ownBillId?: string;
 }) {
   const query = billNumberUseQuerySchema.safeParse({ paperKind, number });
-  const usedBy = useNumberUse("number-use", query.data, askAgain);
+  const usedBy = useNumberUse("number-use", query.data, askAgain, ownBillId);
 
   return (
     <>
@@ -64,6 +67,7 @@ export function RefillerSlipNumberField({
   number,
   onNumber,
   askAgain,
+  ownBillId,
 }: {
   /** Whose slip it is, once chosen. Until then nothing can be looked up. */
   refiller: ChosenParty | null;
@@ -71,12 +75,14 @@ export function RefillerSlipNumberField({
   onNumber: (number: string) => void;
   /** Changes when the number should be looked up again. */
   askAgain: number;
+  /** The bill being corrected, whose own number is no cause for warning. */
+  ownBillId?: string;
 }) {
   const query = refillerRefillerSlipNumberUseQuerySchema.safeParse({
     refillerId: refiller?.id,
     number,
   });
-  const usedBy = useNumberUse("refiller-slip-number-use", query.data, askAgain);
+  const usedBy = useNumberUse("refiller-slip-number-use", query.data, askAgain, ownBillId);
 
   return (
     <NumberField label="Refiller's slip number" number={number} onNumber={onNumber} usedBy={usedBy}>
@@ -86,18 +92,23 @@ export function RefillerSlipNumberField({
   );
 }
 
-/** The posted bill that has the number asked about, if the answer is in and there is one. */
+/**
+ * The other posted bill that has the number asked about, if the answer is in and
+ * there is one.
+ */
 function useNumberUse(
   question: "number-use" | "refiller-slip-number-use",
   query: Record<string, string> | undefined,
   askAgain: number,
+  ownBillId: string | undefined,
 ) {
   const answer = useLookup(
     query ? `${NEW_BILL_PATH}/${question}?${new URLSearchParams(query).toString()}` : null,
     billNumberUseSchema,
     askAgain,
   );
-  return answer?.data?.usedBy;
+  const usedBy = answer?.data?.usedBy;
+  return usedBy?.id === ownBillId ? undefined : usedBy;
 }
 
 /** A box for a bill's number, warning of the bill that already has it. */

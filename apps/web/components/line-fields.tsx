@@ -1,6 +1,6 @@
 "use client";
 
-import { FILL_STATES, type FillState, type Gas } from "@gasflow/shared";
+import { FILL_STATES, type BillLine, type FillState, type Gas } from "@gasflow/shared";
 import { FILL_STATE_NAMES } from "@/lib/bill-names";
 import { buttonStyles } from "./button-styles";
 import { Field, SelectField } from "./fields";
@@ -22,6 +22,16 @@ export interface FormLine {
 
 export function blankLine(key: number): FormLine {
   return { key, gasId: "", quantity: "" };
+}
+
+/** The lines of a saved bill, as a form starts with them to be corrected. */
+export function asFormLines(lines: BillLine[]): FormLine[] {
+  return lines.map(({ gas, fillState, quantity }, index) => ({
+    key: index + 1,
+    gasId: gas.id,
+    fillState,
+    quantity: String(quantity),
+  }));
 }
 
 /** A key that none of these lines has. */

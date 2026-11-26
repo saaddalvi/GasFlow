@@ -1,12 +1,14 @@
 import {
+  billContentSchema,
   HOLDER_TYPES,
   type Bill,
+  type BillContent,
   type BillListQuery,
   type BillNumberUseQuery,
   type OpeningStockListQuery,
   type RefillerSlipNumberUseQuery,
 } from "@gasflow/shared";
-import type { Database } from "../database";
+import type { Database, Transaction } from "../database";
 import { fromDatabaseDate } from "../database-date";
 import type { Prisma } from "../generated/prisma/client";
 import { Refusal } from "../refusal";
@@ -25,24 +27,42 @@ export async function getBill(db: Database, billId: string): Promise<Bill> {
     where: { id: billId },
     select: {
       ...SUMMARY,
+      ...CONTENT,
       slipNumber: true,
-      vehicle: { select: { id: true, plate: true, label: true } },
-      notes: true,
       enteredBy: { select: STAFF },
       enteredAt: true,
       cancelReason: true,
       cancelNotes: true,
       cancelledBy: { select: STAFF },
       cancelledAt: true,
+      revisions: {
+        select: { content: true, replacedBy: { select: STAFF }, replacedAt: true },
+        orderBy: { version: "asc" },
+      },
     },
   });
   if (!bill) {
     throw noSuchBill();
   }
-  const { enteredAt, cancelReason, cancelNotes, cancelledBy, cancelledAt, ...rest } = bill;
+  const { enteredAt, cancelReason, cancelNotes, cancelledBy, cancelledAt, revisions, ...rest } =
+    bill;
+  const last = revisions.at(-1);
   return {
     ...asReported(rest),
     enteredAt: enteredAt.toISOString(),
+    lastCorrection: last
+      ? { correctedBy: last.replacedBy, correctedAt: last.replacedAt.toISOString() }
+      : null,
+    // Each version was saved by whoever replaced the one before it, and the first
+    // by whoever entered the bill.
+    earlierVersions: revisions.map(({ content }, index) => {
+      const before = revisions[index - 1];
+      return {
+        ...billContentSchema.parse(content),
+        savedBy: before?.replacedBy ?? rest.enteredBy,
+        savedAt: (before?.replacedAt ?? enteredAt).toISOString(),
+      };
+    }),
     // A cancelled bill has a reason, someone who gave it and a time, by a check
     // in the database. No other bill has any of them.
     cancellation:
@@ -56,6 +76,21 @@ export async function getBill(db: Database, billId: string): Promise<Bill> {
         : null,
     returns: await getBillReturns(db, bill),
   };
+}
+
+/** What a bill says now that a correction can change, as the API reports it. */
+export async function readContent(tx: Transaction, billId: string): Promise<BillContent> {
+  const where = { id: billId };
+  const { fromParty, toParty, vehicle, ...columns } = CONTENT;
+  // One relation at a time, since a transaction's one connection cannot run the
+  // queries for several side by side.
+  const bill = {
+    ...(await tx.bill.findUniqueOrThrow({ where, select: columns })),
+    ...(await tx.bill.findUniqueOrThrow({ where, select: { fromParty } })),
+    ...(await tx.bill.findUniqueOrThrow({ where, select: { toParty } })),
+    ...(await tx.bill.findUniqueOrThrow({ where, select: { vehicle } })),
+  };
+  return billContentSchema.parse(asReported(bill));
 }
 
 /** One page of the bills, of either status unless one is asked for, the newest first. */
@@ -178,16 +213,15 @@ const PARTY = { id: true, name: true, type: true } as const;
 /** The columns the API reports for whoever entered a bill. */
 const STAFF = { id: true, displayName: true } as const;
 
-/** What a list of bills shows of each one. */
-const SUMMARY = {
-  id: true,
-  type: true,
+/** The columns that hold what a correction can change. */
+const CONTENT = {
   paperKind: true,
   number: true,
   date: true,
-  status: true,
   fromParty: { select: PARTY },
   toParty: { select: PARTY },
+  vehicle: { select: { id: true, plate: true, label: true } },
+  notes: true,
   lines: {
     select: {
       id: true,
@@ -197,4 +231,17 @@ const SUMMARY = {
     },
     orderBy: { lineNo: "asc" },
   },
+} as const;
+
+/** What a list of bills shows of each one. */
+const SUMMARY = {
+  id: true,
+  type: true,
+  paperKind: true,
+  number: true,
+  date: true,
+  status: true,
+  fromParty: CONTENT.fromParty,
+  toParty: CONTENT.toParty,
+  lines: CONTENT.lines,
 } as const;

@@ -4,6 +4,7 @@ import {
   checkInput,
   FILL_STATES,
   newBillSchema,
+  type Bill,
   type FillState,
   type Gas,
   type NewBill,
@@ -17,14 +18,22 @@ import { ActionForm } from "@/components/action-form";
 import { BillDateField } from "@/components/bill-date-field";
 import { buttonStyles } from "@/components/button-styles";
 import { SelectField, TextAreaField } from "@/components/fields";
-import { asNewLines, blankLine, LineList, nextKey, type FormLine } from "@/components/line-fields";
+import {
+  asFormLines,
+  asNewLines,
+  blankLine,
+  LineList,
+  nextKey,
+  type FormLine,
+} from "@/components/line-fields";
 import { LoadError } from "@/components/load-error";
 import type { Outcome } from "@/lib/api";
 import { BILL_TYPE_NAMES, FILL_STATE_NAMES } from "@/lib/bill-names";
 import { holdEnter } from "@/lib/hold-enter";
-import { BILLS_PATH } from "@/lib/routes";
+import { billPath, BILLS_PATH } from "@/lib/routes";
 import { useLastGiven } from "@/lib/use-last-given";
 import { vehicleName } from "@/lib/vehicle-names";
+import { correctBill } from "../actions";
 import { saveBill } from "./actions";
 import { BillNumberFields, RefillerSlipNumberField } from "./bill-number-fields";
 import { NewPartyDialog } from "./new-party-dialog";
@@ -38,6 +47,9 @@ export interface FormChoices {
   vehicles: Vehicle[];
 }
 
+/** A bill of a type this form offers, to be corrected on it. */
+export type PaperBill = Bill & { type: NewBill["type"] };
+
 /** How the form differs from one type of bill to another. */
 const BILL_FORMS: Record<NewBill["type"], { partyType: PickableType; fillState: FillState }> = {
   dispatch: { partyType: "customer", fillState: "filled" },
@@ -45,11 +57,18 @@ const BILL_FORMS: Record<NewBill["type"], { partyType: PickableType; fillState: 
   return_from_refiller: { partyType: "refiller", fillState: "filled" },
 };
 
-export function BillForm({ choices }: { choices: FormChoices | null }) {
+export function BillForm({
+  choices,
+  bill,
+}: {
+  choices: FormChoices | null;
+  /** The bill being corrected. Left out for a new one. */
+  bill?: PaperBill;
+}) {
   const shown = useLastGiven(choices);
 
   return shown ? (
-    <Form choices={shown} />
+    <Form choices={shown} bill={bill} />
   ) : (
     <LoadError>
       The form could not be loaded. Check that the API is running, then reload the page.
@@ -57,18 +76,28 @@ export function BillForm({ choices }: { choices: FormChoices | null }) {
   );
 }
 
-function Form({ choices: { startDate, today, gases, vehicles } }: { choices: FormChoices }) {
+function Form({
+  choices: { startDate, today, gases, vehicles },
+  bill,
+}: {
+  choices: FormChoices;
+  bill?: PaperBill;
+}) {
   const router = useRouter();
-  const [type, setType] = useState<NewBill["type"]>("dispatch");
-  const [paperKind, setPaperKind] = useState<PaperKind>("bill");
+  const [type, setType] = useState<NewBill["type"]>(bill?.type ?? "dispatch");
+  const [paperKind, setPaperKind] = useState<PaperKind>(bill?.paperKind ?? "bill");
   // Kept apart, so that a number copied from one paper is not saved as the other's.
-  const [paperNumber, setPaperNumber] = useState("");
-  const [refillerSlipNumber, setRefillerSlipNumber] = useState("");
-  const [date, setDate] = useState(today);
+  const [paperNumber, setPaperNumber] = useState(bill?.paperKind ? bill.number : "");
+  const [refillerSlipNumber, setRefillerSlipNumber] = useState(
+    bill?.type === "return_from_refiller" ? bill.number : "",
+  );
+  const [date, setDate] = useState(bill?.date ?? today);
   // One of each type is remembered, in case the type is changed and changed back.
-  const [chosen, setChosen] = useState<Partial<Record<PickableType, ChosenParty | null>>>({});
+  const [chosen, setChosen] = useState<Partial<Record<PickableType, ChosenParty | null>>>(() =>
+    bill ? { [BILL_FORMS[bill.type].partyType]: namedOn(bill) } : {},
+  );
   const [newName, setNewName] = useState("");
-  const [lines, setLines] = useState(() => [blankLine(1)]);
+  const [lines, setLines] = useState(() => (bill ? asFormLines(bill.lines) : [blankLine(1)]));
   // How many saves have been turned down, each of which may mean the number is taken.
   const [refusals, setRefusals] = useState(0);
   const newParty = useRef<ActionDialogHandle>(null);
@@ -89,7 +118,11 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
       notes: form.get("notes"),
       lines: asNewLines(lines, defaultFillState),
     });
-    const outcome = data ? await saveBill(data) : { error: problem };
+    const outcome = !data
+      ? { error: problem }
+      : bill
+        ? await correctBill(bill.id, data)
+        : await saveBill(data);
     if (outcome.error) setRefusals((count) => count + 1);
     return outcome;
   }
@@ -100,7 +133,8 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
     const listed = new Set(kept.map((line) => line.gasId));
     const first = nextKey(lines);
     const added = gases
-      .filter((gas) => !listed.has(gas.id))
+      // A retired gas is here only for a bill that already has it.
+      .filter((gas) => gas.active && !listed.has(gas.id))
       .map((gas, index) => ({ ...blankLine(first + index), gasId: gas.id, optional: true }));
     if (added.length > 0) setLines([...kept, ...added]);
   }
@@ -110,28 +144,32 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
       <section onKeyDown={holdEnter} className="rounded-xl border border-slate-200 bg-white p-5">
         <ActionForm
           action={submit}
-          submitLabel="Save bill"
-          onCancel={() => router.push(BILLS_PATH)}
+          submitLabel={bill ? "Save correction" : "Save bill"}
+          onCancel={() => router.push(bill ? billPath(bill.id) : BILLS_PATH)}
         >
           <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-            <SelectField
-              label="Type"
-              required
-              value={type}
-              onChange={(event) => setType(event.target.value as NewBill["type"])}
-            >
-              {Object.keys(BILL_FORMS).map((option) => (
-                <option key={option} value={option}>
-                  {BILL_TYPE_NAMES[option as NewBill["type"]]}
-                </option>
-              ))}
-            </SelectField>
+            {/* A saved bill keeps its type. */}
+            {!bill && (
+              <SelectField
+                label="Type"
+                required
+                value={type}
+                onChange={(event) => setType(event.target.value as NewBill["type"])}
+              >
+                {Object.keys(BILL_FORMS).map((option) => (
+                  <option key={option} value={option}>
+                    {BILL_TYPE_NAMES[option as NewBill["type"]]}
+                  </option>
+                ))}
+              </SelectField>
+            )}
             {type === "return_from_refiller" ? (
               <RefillerSlipNumberField
                 refiller={party}
                 number={refillerSlipNumber}
                 onNumber={setRefillerSlipNumber}
                 askAgain={refusals}
+                ownBillId={bill?.id}
               />
             ) : (
               <BillNumberFields
@@ -140,6 +178,7 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
                 onPaperKind={setPaperKind}
                 onNumber={setPaperNumber}
                 askAgain={refusals}
+                ownBillId={bill?.id}
               />
             )}
             <BillDateField startDate={startDate} value={date} onChange={setDate} />
@@ -153,7 +192,7 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
                 newParty.current?.open();
               }}
             />
-            <SelectField label="Vehicle" name="vehicleId" defaultValue="">
+            <SelectField label="Vehicle" name="vehicleId" defaultValue={bill?.vehicle?.id ?? ""}>
               <option value="">No vehicle</option>
               {vehicles.map((vehicle) => (
                 <option key={vehicle.id} value={vehicle.id}>
@@ -162,7 +201,7 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
               ))}
             </SelectField>
             <div className="sm:col-span-2">
-              <TextAreaField label="Notes" name="notes" />
+              <TextAreaField label="Notes" name="notes" defaultValue={bill?.notes ?? ""} />
             </div>
           </div>
           <fieldset className="min-w-0 space-y-3 border-t border-slate-100 pt-4">
@@ -190,6 +229,11 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
       <NewPartyDialog ref={newParty} type={partyType} name={newName} onAdded={choose} />
     </div>
   );
+}
+
+/** The customer or refiller a bill names. */
+function namedOn({ type, from, to }: PaperBill): ChosenParty | null {
+  return type === "return_from_refiller" ? from : to;
 }
 
 /** The cylinders on the lines so far, to check against the paper. */

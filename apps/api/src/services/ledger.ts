@@ -3,6 +3,11 @@ import {
   PAPER_KIND_NAMES,
   pendingBillName,
   whyNotCancel,
+  whyNotCorrect,
+  whyUncorrectable,
+  type BillContent,
+  type BillCorrection,
+  type BlockingBill,
   type Matched,
   type NewAllocation,
   type NewBill,
@@ -15,14 +20,21 @@ import {
   type ReceivedReturn,
   type Staff,
 } from "@gasflow/shared";
+import { isDeepStrictEqual } from "node:util";
 import { today, type Clock } from "../clock";
 import { isRepeat, type Database, type Transaction } from "../database";
 import { fromDatabaseDate, toDatabaseDate } from "../database-date";
 import { BlockedRefusal, Refusal } from "../refusal";
-import { noSuchBill, POSTED_OPENING_STOCK } from "./bills";
+import { noSuchBill, POSTED_OPENING_STOCK, readContent } from "./bills";
 import { noSuchGas } from "./gases";
 import { noSuchParty } from "./parties";
-import { findClearableLines, findPendingRows, type ClearableLine } from "./pending";
+import {
+  findAllocationsToBill,
+  findClearableLines,
+  findPendingRows,
+  type AllocationToBill,
+  type ClearableLine,
+} from "./pending";
 import { getStartDate } from "./setup";
 import { getShop } from "./shop";
 import { findUnmatchedLines, noSuchReturn } from "./unmatched";
@@ -98,10 +110,7 @@ export function enterBill(
   bill: NewBill,
 ): Promise<string> {
   const { type, number, date, vehicleId, notes, lines } = bill;
-  const partyId = bill.type === "dispatch" ? bill.customerId : bill.refillerId;
-  const named = NAMED_PARTY[type];
-  // A return from a refiller is numbered by the refiller's slip, not the agency's paper.
-  const paperKind = bill.type === "return_from_refiller" ? null : bill.paperKind;
+  const { partyId, named, paperKind, takenNumber } = paperDetails(bill);
   const save = db.$transaction(async (tx) => {
     await refuseUnrecordedDate(tx, date);
     refuseUnusableParty(await lockParty(tx, partyId), named);
@@ -109,17 +118,13 @@ export function enterBill(
       await refuseUnusableVehicle(tx, vehicleId);
     }
     await refuseUnusableGases(tx, lines);
-    const shop = await getShop(tx);
-    const [fromPartyId, toPartyId] =
-      type === "return_from_refiller" ? [partyId, shop.id] : [shop.id, partyId];
     const saved = await tx.bill.create({
       data: {
         type,
         paperKind,
         number,
         date: toDatabaseDate(date),
-        fromPartyId,
-        toPartyId,
+        ...sides(type, partyId, (await getShop(tx)).id),
         vehicleId,
         notes,
         enteredById: staff.id,
@@ -130,12 +135,326 @@ export function enterBill(
     });
     return saved.id;
   });
-  return refusingTakenNumber(
-    save,
-    paperKind
-      ? `${PAPER_KIND_NAMES[paperKind]} number ${number} is already in use.`
-      : `This refiller's slip number ${number} is already in use.`,
+  return refusingTakenNumber(save, takenNumber);
+}
+
+/**
+ * Changes a posted bill to what the correction says, so that every figure follows
+ * it, and keeps what it said before. What it may newly name is limited as on a new
+ * bill, but whatever it already names may stay, even if since made inactive or
+ * retired. It may not come to contradict the returns matched to it.
+ */
+export function correctBill(
+  db: Database,
+  clock: Clock,
+  staff: Staff,
+  billId: string,
+  correction: BillCorrection,
+): Promise<void> {
+  // Opening stock is corrected in its lines alone.
+  const paper =
+    correction.type === "opening_stock" ? null : { ...correction, ...paperDetails(correction) };
+  const save = db.$transaction(async (tx) => {
+    const bill = await lockBill(tx, billId);
+    const uncorrectable = whyUncorrectable(bill);
+    if (uncorrectable) {
+      throw new Refusal(409, uncorrectable);
+    }
+    const notAllowed = whyNotCorrect(bill, staff, today(clock));
+    if (notAllowed) {
+      throw new Refusal(403, notAllowed);
+    }
+    if (correction.type !== bill.type) {
+      throw new Refusal(409, "The type of a bill cannot be changed. Cancel it and enter it again.");
+    }
+    const shop = await getShop(tx);
+    const namedBefore = partyConcerned(bill, shop.id);
+    const partyId = paper?.partyId ?? namedBefore;
+    // The party it names now and the one it is to name, as returns may be matched
+    // to it by either of them in the meantime.
+    const parties = await lockParties(tx, [namedBefore, partyId]);
+    if (paper) {
+      await refuseUnrecordedDate(tx, paper.date);
+      if (partyId !== namedBefore) {
+        refuseUnusableParty(parties.get(partyId)!, paper.named);
+      }
+      if (paper.vehicleId && paper.vehicleId !== bill.vehicleId) {
+        await refuseUnusableVehicle(tx, paper.vehicleId);
+      }
+    }
+    const gasesOnBill = new Set(bill.lines.map((line) => line.gasId));
+    await refuseUnusableGases(
+      tx,
+      correction.lines.filter((line) => !gasesOnBill.has(line.gasId)),
+    );
+    // What is matched to the bill changes only while its party's lock is held, so
+    // it is read after.
+    const matched = await findAllocationsToBill(tx, billId);
+    refuseContradictingReturns(pendingBillName(bill), matched, {
+      changesParty: partyId !== namedBefore,
+      date: paper?.date,
+      lines: correction.lines,
+    });
+    const earlier = await readContent(tx, billId);
+    if (paper) {
+      const { type, paperKind, number, date, vehicleId, notes } = paper;
+      await tx.bill.update({
+        where: { id: billId },
+        data: {
+          paperKind,
+          number,
+          date: toDatabaseDate(date),
+          ...sides(type, partyId, shop.id),
+          vehicleId,
+          notes,
+        },
+      });
+    }
+    await replaceLines(tx, billId, correction.lines, matched);
+    // A correction that changes nothing leaves nothing to keep.
+    if (!isDeepStrictEqual(await readContent(tx, billId), earlier)) {
+      await keepVersion(tx, clock, staff, billId, earlier);
+    }
+  });
+  return paper ? refusingTakenNumber(save, paper.takenNumber) : save;
+}
+
+/**
+ * Refuses a correction that would leave a bill contradicting the returns matched to
+ * it, saying all that is wrong and naming each return in the way.
+ */
+function refuseContradictingReturns(
+  name: string,
+  matched: AllocationToBill[],
+  {
+    changesParty,
+    date,
+    lines,
+  }: {
+    changesParty: boolean;
+    /** Left out when the correction cannot change it. */
+    date?: string;
+    lines: NewBillLine[];
+  },
+): void {
+  if (matched.length === 0) {
+    return;
+  }
+  // Only a customer's bills have anything matched to them.
+  if (changesParty) {
+    throw new BlockedRefusal(
+      `${name} has returns matched to it, so its customer cannot be changed. ` +
+        "Cancel those returns first.",
+      returnsAmong(matched),
+    );
+  }
+  const problems: string[] = [];
+  const inTheWay = new Set<AllocationToBill>();
+  for (const gasId of new Set(matched.map((allocation) => allocation.gasId))) {
+    const ofGas = matched.filter((allocation) => allocation.gasId === gasId);
+    const returned = totalOf(ofGas);
+    if (totalOf(lines.filter((line) => line.gasId === gasId)) < returned) {
+      problems.push(
+        `${name} cannot have fewer than the ${returned} ${ofGas[0]!.gasName} returned against it.`,
+      );
+      ofGas.forEach((allocation) => inTheWay.add(allocation));
+    }
+  }
+  const earlier = matched.filter(
+    (allocation) => date && fromDatabaseDate(allocation.returnDate) < date,
   );
+  if (earlier.length > 0) {
+    problems.push(`${name} cannot be dated after cylinders were returned against it.`);
+    earlier.forEach((allocation) => inTheWay.add(allocation));
+  }
+  if (problems.length > 0) {
+    throw new BlockedRefusal(
+      `${problems.join(" ")} Cancel the returns in the way first, or change the correction.`,
+      // As ordered among everything matched, the oldest first.
+      returnsAmong(matched.filter((allocation) => inTheWay.has(allocation))),
+    );
+  }
+}
+
+/** The returns that these are parts of, each once, in the order they come. */
+function returnsAmong(matched: AllocationToBill[]): BlockingBill[] {
+  return [
+    ...new Map(
+      matched.map(({ returnId: id, returnNumber: number }) => [id, { id, number }]),
+    ).values(),
+  ];
+}
+
+/**
+ * Gives a bill the lines it is corrected to. A saved line carries on as one of them
+ * while one of its gas is left, those with returns matched to them before the
+ * rest. What is matched to a line stays on it as far as it still fits, and
+ * otherwise moves to other lines of its gas.
+ */
+async function replaceLines(
+  tx: Transaction,
+  billId: string,
+  lines: NewBillLine[],
+  matched: AllocationToBill[],
+): Promise<void> {
+  const before = await tx.billLine.findMany({
+    where: { billId },
+    select: { id: true, gasId: true, fillState: true, quantity: true },
+    orderBy: { lineNo: "asc" },
+  });
+  const kept = pairLines(before, lines, new Set(matched.map((part) => part.clearedLineId)));
+  // Out of the way, so that no two lines are ever in one place.
+  await tx.$executeRaw`UPDATE bill_lines SET line_no = -line_no WHERE bill_id = ${billId}::uuid`;
+  const after: { id: string; gasId: string; quantity: number }[] = [];
+  for (const [index, line] of numbered(lines).entries()) {
+    const id = kept[index];
+    const select = { id: true, gasId: true, quantity: true };
+    after.push(
+      id
+        ? await tx.billLine.update({ where: { id }, data: line, select })
+        : await tx.billLine.create({ data: { ...line, billId }, select }),
+    );
+  }
+  await moveAllocations(tx, after, matched);
+  const dropped = before.map((line) => line.id).filter((id) => !kept.includes(id));
+  // All that can still point at these is what cancelled returns had matched, which
+  // counts for nothing.
+  await tx.allocation.deleteMany({ where: { clearedLineId: { in: dropped } } });
+  await tx.billLine.deleteMany({ where: { id: { in: dropped } } });
+}
+
+/**
+ * For each of the lines a bill is corrected to, the saved line that carries on as
+ * it, if any. As many saved lines of a gas carry on as the correction has lines of
+ * it, those with returns matched to them before the rest, and each as the line
+ * most like it, in its own place if it can.
+ */
+function pairLines(
+  before: (NewBillLine & { id: string })[],
+  lines: NewBillLine[],
+  returnedAgainst: Set<string>,
+): (string | undefined)[] {
+  const unclaimed = new Map<string, number>();
+  for (const { gasId } of lines) {
+    unclaimed.set(gasId, (unclaimed.get(gasId) ?? 0) + 1);
+  }
+  const returnsFirst = [...before.entries()].sort(
+    ([, one], [, other]) =>
+      Number(returnedAgainst.has(other.id)) - Number(returnedAgainst.has(one.id)),
+  );
+  const carrying = returnsFirst.filter(([, { gasId }]) => {
+    const left = unclaimed.get(gasId) ?? 0;
+    unclaimed.set(gasId, left - 1);
+    return left > 0;
+  });
+
+  type Alike = (saved: NewBillLine, line: NewBillLine) => boolean;
+  const sameGas: Alike = (saved, line) => saved.gasId === line.gasId;
+  const sameFill: Alike = (saved, line) =>
+    sameGas(saved, line) && saved.fillState === line.fillState;
+  const unchanged: Alike = (saved, line) =>
+    sameFill(saved, line) && saved.quantity === line.quantity;
+  const kept = lines.map((): string | undefined => undefined);
+  // All of them try for each likeness before any settles for less.
+  for (const alike of [unchanged, sameFill, sameGas]) {
+    for (const inPlace of [true, false]) {
+      for (const [place, saved] of carrying) {
+        if (kept.includes(saved.id)) continue;
+        const index = lines.findIndex(
+          (line, at) => !kept[at] && (!inPlace || at === place) && alike(saved, line),
+        );
+        if (index >= 0) kept[index] = saved.id;
+      }
+    }
+  }
+  return kept;
+}
+
+/** Takes off each line whatever is matched to it beyond its quantity, and puts it on others. */
+async function moveAllocations(
+  tx: Transaction,
+  lines: { id: string; gasId: string; quantity: number }[],
+  matched: AllocationToBill[],
+): Promise<void> {
+  const free = lines.map(({ id, gasId, quantity }) => ({ lineId: id, gasId, left: quantity }));
+  const moving: AllocationToBill[] = [];
+  for (const allocation of matched) {
+    const { clearingLineId, clearedLineId, quantity } = allocation;
+    const line = free.find((other) => other.lineId === clearedLineId);
+    const stays = Math.min(quantity, line?.left ?? 0);
+    if (line) line.left -= stays;
+    if (stays === quantity) continue;
+    const where = { clearingLineId_clearedLineId: { clearingLineId, clearedLineId } };
+    if (stays > 0) {
+      await tx.allocation.update({ where, data: { quantity: stays } });
+    } else {
+      await tx.allocation.delete({ where });
+    }
+    moving.push({ ...allocation, quantity: quantity - stays });
+  }
+  // Only once everything staying put has its room.
+  for (const { clearingLineId, gasId, quantity } of moving) {
+    const ofGas = free.filter((line) => line.gasId === gasId);
+    for (const to of takeInTurn(ofGas, quantity)) {
+      await addAllocation(tx, { clearingLineId, clearedLineId: to.lineId }, to.quantity);
+    }
+  }
+}
+
+/** Matches more of a return's line to a bill's line, which it may be matched to already. */
+async function addAllocation(
+  tx: Transaction,
+  pair: { clearingLineId: string; clearedLineId: string },
+  quantity: number,
+): Promise<void> {
+  await tx.allocation.upsert({
+    where: { clearingLineId_clearedLineId: pair },
+    create: { ...pair, quantity },
+    update: { quantity: { increment: quantity } },
+  });
+}
+
+/** Keeps what the bill said before this correction as its latest earlier version. */
+async function keepVersion(
+  tx: Transaction,
+  clock: Clock,
+  staff: Staff,
+  billId: string,
+  content: BillContent,
+): Promise<void> {
+  // The bill is locked, so no other correction can take the same version.
+  const kept = await tx.billRevision.count({ where: { billId } });
+  await tx.billRevision.create({
+    data: {
+      billId,
+      version: kept + 1,
+      content,
+      replacedById: staff.id,
+      replacedAt: clock.now(),
+    },
+  });
+}
+
+/** What follows from the type of a bill copied from paper, on entry and on correction. */
+function paperDetails(bill: NewBill) {
+  // A return from a refiller is numbered by the refiller's slip, not the agency's paper.
+  const paperKind = bill.type === "return_from_refiller" ? null : bill.paperKind;
+  return {
+    partyId: bill.type === "dispatch" ? bill.customerId : bill.refillerId,
+    named: NAMED_PARTY[bill.type],
+    paperKind,
+    /** What to say if another bill turns out to have the number. */
+    takenNumber: paperKind
+      ? `${PAPER_KIND_NAMES[paperKind]} number ${bill.number} is already in use.`
+      : `This refiller's slip number ${bill.number} is already in use.`,
+  };
+}
+
+/** Which of the shop and the party the cylinders leave, and which receives them. */
+function sides(type: NewBill["type"], partyId: string, shopId: string) {
+  const [fromPartyId, toPartyId] =
+    type === "return_from_refiller" ? [partyId, shopId] : [shopId, partyId];
+  return { fromPartyId, toPartyId };
 }
 
 /**
@@ -250,12 +569,7 @@ export function matchUnmatched(db: Database, returnId: string, match: NewMatch):
     for (const from of takeInTurn(clearing, quantity)) {
       for (const to of takeInTurn(cleared, from.quantity)) {
         const pair = { clearingLineId: from.lineId, clearedLineId: to.lineId };
-        // An earlier match may have joined these two lines already.
-        await tx.allocation.upsert({
-          where: { clearingLineId_clearedLineId: pair },
-          create: { ...pair, quantity: to.quantity },
-          update: { quantity: { increment: to.quantity } },
-        });
+        await addAllocation(tx, pair, to.quantity);
       }
     }
     return { unmatched: unmatched - quantity };
@@ -274,27 +588,7 @@ export function cancelBill(
   { reason, notes }: NewCancellation,
 ): Promise<void> {
   return db.$transaction(async (tx) => {
-    const named = await tx.bill.findUnique({
-      where: { id: billId },
-      select: { fromParty: { select: SIDE }, toParty: { select: SIDE } },
-    });
-    if (!named) {
-      throw noSuchBill();
-    }
-    await lockParty(tx, partyConcerned(named));
-    // Read after the party is locked, so that it includes whatever a save just
-    // before this one changed.
-    const bill = await tx.bill.findUniqueOrThrow({
-      where: { id: billId },
-      select: {
-        type: true,
-        paperKind: true,
-        number: true,
-        status: true,
-        enteredBy: { select: { id: true } },
-        enteredAt: true,
-      },
-    });
+    const bill = await lockBill(tx, billId);
     const notAllowed = whyNotCancel(bill, staff, today(clock));
     if (notAllowed) {
       throw new Refusal(403, notAllowed);
@@ -302,6 +596,9 @@ export function cancelBill(
     if (bill.status === "cancelled") {
       throw new Refusal(409, "This bill has already been cancelled.");
     }
+    // What is matched to the bill changes only while this lock is held, so it is
+    // read after.
+    await lockParty(tx, partyConcerned(bill, (await getShop(tx)).id));
     await refuseWhileReturnedAgainst(tx, billId, bill);
     await tx.bill.update({
       where: { id: billId },
@@ -317,7 +614,7 @@ export function cancelBill(
 }
 
 /**
- * Refuses a change to a dispatch bill or opening stock that posted returns are
+ * Refuses to cancel a dispatch bill or opening stock that posted returns are
  * matched to, naming each of them, the oldest first.
  */
 async function refuseWhileReturnedAgainst(
@@ -325,36 +622,55 @@ async function refuseWhileReturnedAgainst(
   billId: string,
   bill: Parameters<typeof pendingBillName>[0],
 ): Promise<void> {
-  const returns = await tx.bill.findMany({
-    where: {
-      status: "posted",
-      lines: { some: { clears: { some: { clearedLine: { billId } } } } },
-    },
-    select: { id: true, number: true },
-    orderBy: [{ date: "asc" }, { enteredAt: "asc" }, { id: "asc" }],
-  });
-  if (returns.length > 0) {
+  const matched = await findAllocationsToBill(tx, billId);
+  if (matched.length > 0) {
     // Only dispatch bills and opening stock have anything matched to them.
     throw new BlockedRefusal(
       `${pendingBillName(bill)} has returns matched to it. Cancel those first.`,
-      returns,
+      returnsAmong(matched),
     );
   }
 }
 
-const SIDE = { id: true, type: true } as const;
+/**
+ * The bill, held until the transaction ends, so that two changes to one bill take
+ * turns. Nothing else changes a saved bill's row or lines, so they stay as read
+ * here. Whom it names can be changed, so it is locked before its party is.
+ */
+async function lockBill(tx: Transaction, billId: string) {
+  await tx.$queryRaw`SELECT 1 FROM bills WHERE id = ${billId}::uuid FOR NO KEY UPDATE`;
+  const bill = await tx.bill.findUnique({
+    where: { id: billId },
+    select: {
+      type: true,
+      paperKind: true,
+      number: true,
+      status: true,
+      fromPartyId: true,
+      toPartyId: true,
+      vehicleId: true,
+      // The one relation read, since a transaction's one connection cannot run
+      // the queries for several side by side.
+      lines: { select: { gasId: true } },
+      enteredById: true,
+      enteredAt: true,
+    },
+  });
+  if (!bill) {
+    throw noSuchBill();
+  }
+  return { ...bill, enteredBy: { id: bill.enteredById } };
+}
 
 /**
- * Whom two changes to a bill take turns by: the party named on it beside the
+ * Whom changes touching a bill take turns by: the party named on it beside the
  * shop, or the shop itself on its own opening stock.
  */
-function partyConcerned({
-  fromParty,
-  toParty,
-}: Record<"fromParty" | "toParty", { id: string; type: string } | null>): string {
-  const parties = [fromParty, toParty].filter((party) => party !== null);
-  // Every bill names a party, by a check in the database.
-  return (parties.find((party) => party.type !== "shop") ?? parties[0]!).id;
+function partyConcerned(
+  { fromPartyId, toPartyId }: { fromPartyId: string | null; toPartyId: string | null },
+  shopId: string,
+): string {
+  return [fromPartyId, toPartyId].find((id) => id !== null && id !== shopId) ?? shopId;
 }
 
 /**
@@ -496,8 +812,8 @@ function returnLines(
 
 /**
  * The database keeps apart the numbers on each paper kind, and each refiller's
- * slip numbers, even between saves at once. A new bill and its lines can repeat
- * nothing else.
+ * slip numbers, even between saves at once. Saving a bill copied from paper, new
+ * or corrected, can repeat nothing else.
  */
 async function refusingTakenNumber<T>(save: Promise<T>, refusal: string): Promise<T> {
   try {
@@ -538,6 +854,18 @@ async function lockParty(tx: Transaction, partyId: string) {
   return party;
 }
 
+/**
+ * The parties, each held as lockParty holds one. They are taken in the order of
+ * their ids, so that two changes needing the same two cannot hold one each.
+ */
+async function lockParties(tx: Transaction, partyIds: string[]) {
+  const parties = new Map<string, Awaited<ReturnType<typeof lockParty>>>();
+  for (const partyId of [...new Set(partyIds)].sort()) {
+    parties.set(partyId, await lockParty(tx, partyId));
+  }
+  return parties;
+}
+
 /** Refuses anyone but an active party of the type that the bill names. */
 function refuseUnusableParty(
   party: { name: string; type: string; active: boolean },
@@ -567,8 +895,7 @@ async function refuseUnusableVehicle(tx: Transaction, vehicleId: string): Promis
 
 /** Refuses lines naming a gas that does not exist or is not offered on anything new. */
 async function refuseUnusableGases(tx: Transaction, lines: NewBillLine[]): Promise<void> {
-  // An id may arrive in capitals, and still names the same gas.
-  const ids = [...new Set(lines.map((line) => line.gasId.toLowerCase()))];
+  const ids = [...new Set(lines.map((line) => line.gasId))];
   const gases = await tx.gas.findMany({
     where: { id: { in: ids } },
     select: { name: true, active: true },

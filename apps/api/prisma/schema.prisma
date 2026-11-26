@@ -68,6 +68,7 @@ model Staff {
   displayName    String @map("display_name")
   billsEntered   Bill[] @relation("bills_entered")
   billsCancelled Bill[] @relation("bills_cancelled")
+  billsCorrected BillRevision[]
 
   @@map("staff")
 }
@@ -162,6 +163,7 @@ model Bill {
   enteredBy     Staff         @relation("bills_entered", fields: [enteredById], references: [id])
   cancelledBy   Staff?        @relation("bills_cancelled", fields: [cancelledById], references: [id], onDelete: Restrict)
   lines         BillLine[]
+  revisions     BillRevision[]
 
   // A party has one opening stock. A cancelled one makes way for another.
   @@unique([toPartyId], map: "bills_one_opening_stock_per_party", where: raw("type = 'opening_stock' AND status = 'posted'"))
@@ -196,6 +198,24 @@ model BillLine {
 
   @@unique([billId, lineNo])
   @@map("bill_lines")
+}
+
+/// A version of a bill that a correction replaced, kept so that it can still be
+/// read. No figure counts it.
+model BillRevision {
+  billId       String   @map("bill_id") @db.Uuid
+  /// Which version of the bill this was, counted from 1, the one first entered.
+  version      Int
+  /// What the bill said, as the API reported it then, with the names of that time.
+  content      Json
+  /// Who made the correction that replaced this version, and when.
+  replacedById String   @map("replaced_by_id") @db.Uuid
+  replacedAt   DateTime @map("replaced_at") @db.Timestamptz(3)
+  bill         Bill     @relation(fields: [billId], references: [id], onDelete: Restrict)
+  replacedBy   Staff    @relation(fields: [replacedById], references: [id], onDelete: Restrict)
+
+  @@id([billId, version])
+  @@map("bill_revisions")
 }
 
 /// The part of a return that is matched to a line of a dispatch bill or opening

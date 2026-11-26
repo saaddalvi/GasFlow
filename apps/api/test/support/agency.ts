@@ -13,6 +13,7 @@ import {
   stockReportSchema,
   unmatchedListSchema,
   vehicleSchema,
+  type Bill,
   type FillState,
   type PartyType,
   type StockReportRow,
@@ -230,6 +231,49 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     return matchedSchema.parse(response.json());
   }
 
+  /** Asks to correct a bill, as the staff member unless told otherwise. */
+  const postCorrection = (
+    bill: { id: string },
+    payload: object,
+    { headers }: { headers: Record<string, string> } = staff,
+  ) => app.inject({ method: "PUT", url: `/api/bills/${bill.id}`, headers, payload });
+
+  /**
+   * What the correction form sends for a bill as it stands, naming its parties and
+   * lines. A test changes whatever it corrects.
+   */
+  function correctionFor(bill: Bill, change: object = {}) {
+    const lines = bill.lines.map(({ gas: { id }, fillState, quantity }) => ({
+      gasId: id,
+      fillState,
+      quantity,
+    }));
+    if (bill.type === "opening_stock") {
+      return { type: bill.type, lines, ...change };
+    }
+    const { type, paperKind, number, date, from, to, vehicle, notes } = bill;
+    return {
+      type,
+      paperKind,
+      number,
+      date,
+      ...(type === "dispatch"
+        ? { customerId: to?.id }
+        : { refillerId: (type === "send_to_refiller" ? to : from)?.id }),
+      vehicleId: vehicle?.id ?? null,
+      notes,
+      lines,
+      ...change,
+    };
+  }
+
+  /** Corrects a bill as the admin, who may correct any, expecting that to be saved. */
+  async function correct(bill: Bill, change: object) {
+    const response = await postCorrection(bill, correctionFor(bill, change), admin);
+    expect(response.statusCode).toBe(200);
+    return billSchema.parse(response.json());
+  }
+
   /** Asks to cancel a bill, as the staff member unless told otherwise. */
   const postCancel = (
     bill: { id: string },
@@ -357,6 +401,9 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     match,
     postCancel,
     cancel,
+    postCorrection,
+    correctionFor,
+    correct,
     pending,
     askSplit,
     split,

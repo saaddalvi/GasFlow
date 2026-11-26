@@ -12,6 +12,11 @@ export function billPath(billId: string): string {
   return `${BILLS_PATH}/${billId}`;
 }
 
+/** Where a posted bill is corrected. */
+export function correctBillPath(billId: string): string {
+  return `${billPath(billId)}/correct`;
+}
+
 /** Where cylinders coming back from a customer are recorded. */
 export const RECEIVE_EMPTIES_PATH = "/returns/new";
 

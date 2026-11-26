@@ -137,15 +137,21 @@ In the API:
   `src/identity.ts`; the real one is `src/clerk-identity.ts`.
 - Only the bill ledger, `src/services/ledger.ts`, changes bills and
   allocations. Each of its operations checks the rules and writes in one
-  transaction. One that creates an allocation, or cancels a bill, first locks the
-  customer (or whichever party the bill names), so that two saves cannot use the
-  same pending cylinders, or return against a bill as it is cancelled. The
-  database keeps bill numbers unique on each paper kind, and a refiller's slip
-  numbers unique for that refiller, ignoring cancelled bills.
+  transaction. One that creates an allocation, or corrects or cancels a bill,
+  locks the customer (or whichever party the bill names) before reading what is
+  matched, so that two saves cannot use the same pending cylinders, or return
+  against a bill as it changes. Correcting and cancelling lock the bill first,
+  because a correction can change whom it names; a change of party locks both,
+  in the order of their ids. The database keeps bill numbers unique on each paper
+  kind, and a refiller's slip numbers unique for that refiller, ignoring
+  cancelled bills.
 - Bills are never deleted, and a cancelled one is never posted again. Everything
-  that counts cylinders reads posted bills only. Who may cancel a bill is decided
-  by `whyNotCancel` in `packages/shared`, which the screens ask too, so that they
-  offer nothing the API would refuse.
+  that counts cylinders reads posted bills only. A correction changes the bill in
+  place and keeps what it said before in `bill_revisions`, which nothing counts.
+- Who may cancel or correct a bill is decided by `whyNotCancel` and
+  `whyNotCorrect` in `packages/shared`, and whether anyone can correct it by
+  `whyUncorrectable`. The screens ask these too, so that they offer nothing the
+  API would refuse.
 - Reports only read. They work every figure out from posted bills, and no stock
   count is stored. Pending cylinders are likewise worked out, by
   `src/services/pending.ts`, from the allocations of posted returns. Unmatched
