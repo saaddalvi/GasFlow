@@ -23,7 +23,7 @@ export function NewPasswordField({ label, ...input }: Omit<FieldProps, "hint">) 
   return (
     <Labelled
       label={label}
-      hint="At least 8 characters, and not one found in a leak."
+      hint="At least 8 characters."
       input={{ ...input, type: shown ? "text" : "password", autoComplete: "new-password" }}
     >
       <button

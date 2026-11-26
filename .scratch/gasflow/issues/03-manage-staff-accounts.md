@@ -6,23 +6,23 @@
 
 **Status:** needs-info
 
-- [ ] An admin can create an account with a name, username and starting password, and that person can then sign in
-- [ ] Clerk's refusals (username taken or too short, password under 8 characters or found in a leak) are shown as clear messages
-- [ ] An admin can set a new password for any staff member
-- [ ] An admin can remove a staff member's access; that person can no longer use the app, and their staff record and name are kept
-- [ ] An admin can make a staff member an admin or remove the role
-- [ ] Every admin has a recovery email, required when the role is granted
+- [x] An admin can create an account with a name, username and starting password, and that person can then sign in
+- [x] Clerk's refusals (username taken or too short, password under 8 characters) are shown as clear messages
+- [x] An admin can set a new password for any staff member
+- [x] An admin can remove a staff member's access; that person can no longer use the app, and their staff record and name are kept
+- [x] An admin can make a staff member an admin or remove the role
+- [x] Every admin has a recovery email, required when the role is granted
 - [x] Staff who are not admins cannot see the Staff screen, and the API refuses their requests
 - [x] API tests cover each action as staff and as admin
 
 ## Comments
 
-**26 November 2026: built in commit `5c2b306`, waiting on a check with real accounts.** Not pushed, so CI has not run on it.
+**26 November 2026: built in commit `5c2b306`, waiting on a check with real accounts.** Pushed, and [CI passed](https://github.com/saaddalvi/GasFlow/actions/runs/45777137984) at `d41b4f2`.
 
 Still to do in the development instance, signed in as the admin, using test accounts:
 
 - Add a staff member on the Staff screen and sign in as them in a private window. Check that their name shows.
-- Try a taken username, a username under 4 characters, a password under 8 characters and a leaked one such as `password123`. Each should show a clear message.
+- Try a taken username, a username under 4 characters and a password under 8 characters. Each should show a clear message. A common password such as `password123` should be accepted.
 - Set a new password for someone who is signed in. The old one should stop working, and they should be signed out within about a minute. Then set your own and sign in again.
 - Remove a signed-in person's access. They should be locked out and unable to sign in, with their name listed under "Access removed".
 - Make someone an admin. In the Clerk dashboard the recovery email should be verified and primary, and the person should see the Staff screen. Change the email; the old address should be gone. Reset their password by email and sign in with the new one.
@@ -42,3 +42,4 @@ For the project owner to decide:
 - An admin made in the Clerk dashboard without a recovery email keeps the role. The Staff screen warns about it.
 - Still open from ticket 02: Clerk lets signed-in people delete their own account (`delete_self`), which could remove the last admin.
 
+**26 November 2026: leaked-password check removed** at the project owner's request. It is off in the Clerk development instance, and the spec's Clerk setup section now says so for production too.

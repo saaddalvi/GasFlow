@@ -201,8 +201,6 @@ function inOurWords({ code, message, longMessage, meta }: ClerkError): string {
     case "form_password_length_too_long":
     case "form_password_size_in_bytes_exceeded":
       return ACCOUNT_PROBLEMS.passwordTooLong;
-    case "form_password_pwned":
-      return ACCOUNT_PROBLEMS.passwordLeaked;
     case "form_param_format_invalid":
       if (aboutEmail) {
         return ACCOUNT_PROBLEMS.emailInvalid;

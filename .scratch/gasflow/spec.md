@@ -252,7 +252,8 @@ A GasFlow application exists in Clerk. Its development instance was configured o
 - Sign-up restricted.
 - Google sign-in off.
 - Device trust off, because staff without an email cannot receive its second-factor challenge on a new device.
-- Minimum password length 8, the lowest Clerk allows. The check against leaked passwords stays on.
+- Minimum password length 8, the lowest Clerk allows. No other password rules.
+- Check against leaked passwords off, both when a password is set and at sign-in, so that staff can choose any password of that length. The project owner decided this on 26 November 2026.
 
 Still to do:
 

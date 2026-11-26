@@ -25,7 +25,6 @@ export const ACCOUNT_PROBLEMS = {
     "A username can use only letters, numbers, - and _, and cannot be all digits.",
   passwordTooShort: "Passwords must be at least 8 characters long.",
   passwordTooLong: "That password is too long. Choose a shorter one.",
-  passwordLeaked: "That password has appeared in a known leak. Choose a different one.",
   emailTaken: "Another account already uses that email address.",
   emailInvalid: "Enter a valid email address.",
 } as const;

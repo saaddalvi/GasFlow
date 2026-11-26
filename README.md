@@ -62,7 +62,7 @@ Do this once for each Clerk instance, in the
 2. Under **Users**, choose **Create user** and fill in:
    - first and last name, which bills will show;
    - a username of at least 4 characters;
-   - a password of at least 8 characters that has not appeared in a known leak;
+   - a password of at least 8 characters;
    - **an email address the admin can read**. This is the recovery email, without
      which a forgotten admin password can only be reset from the dashboard.
 3. Open the new user. Under **Metadata**, edit **Public** to the following and

@@ -10,9 +10,6 @@ import {
 
 const TOKEN_PREFIX = "test-session:";
 
-/** Passwords the stand-in treats as found in a known leak. */
-const LEAKED_PASSWORDS = new Set(["password123"]);
-
 type StoredAccount = Account & { username: string; password: string };
 
 /**
@@ -144,9 +141,6 @@ function passwordProblems(password: string): string[] {
   const problems: string[] = [];
   if (password.length < 8) {
     problems.push(ACCOUNT_PROBLEMS.passwordTooShort);
-  }
-  if (LEAKED_PASSWORDS.has(password)) {
-    problems.push(ACCOUNT_PROBLEMS.passwordLeaked);
   }
   return problems;
 }

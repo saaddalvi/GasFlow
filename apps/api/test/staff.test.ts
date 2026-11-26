@@ -110,11 +110,6 @@ test.each([
     "Passwords must be at least 8 characters long.",
   ],
   [
-    "a password found in a leak",
-    { password: "password123" },
-    "That password has appeared in a known leak. Choose a different one.",
-  ],
-  [
     "two things wrong at once",
     { username: "ab", password: "gas-123" },
     "Usernames must be 4 to 64 characters long. Passwords must be at least 8 characters long.",
@@ -190,12 +185,6 @@ test("an admin sets a new password for a staff member", async () => {
 
 test.each([
   ["under 8 characters", "gas-123", 422, "Passwords must be at least 8 characters long."],
-  [
-    "found in a leak",
-    "password123",
-    422,
-    "That password has appeared in a known leak. Choose a different one.",
-  ],
   ["empty", "", 400, "Enter a password."],
 ])("a new password %s is refused", async (_case, password, status, message) => {
   const { identity, addStaff, setPassword } = await startAsAdmin();
