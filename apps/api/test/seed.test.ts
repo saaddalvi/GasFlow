@@ -27,3 +27,22 @@ test("seeding again changes nothing", async () => {
   expect(shopAfter.json()).toEqual(shopBefore.json());
   expect(gasListSchema.parse(gasesAfter.json()).gases).toHaveLength(10);
 });
+
+test("seeding again keeps what an admin did to the starting gases", async () => {
+  const { app, db, signIn } = await startTestApp();
+  const { headers } = await signIn({ isAdmin: true });
+  const list = async () =>
+    gasListSchema.parse(
+      (await app.inject({ method: "GET", url: "/api/gases?retired=true", headers })).json(),
+    ).gases;
+  const [first, second] = await list();
+  const change = (gasId: string | undefined, payload: object) =>
+    app.inject({ method: "PATCH", url: `/api/gases/${gasId}`, headers, payload });
+  await change(first?.id, { name: "Oxygen" });
+  await change(second?.id, { active: false });
+  const before = await list();
+
+  await seedDatabase(db);
+
+  expect(await list()).toEqual(before);
+});

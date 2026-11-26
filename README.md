@@ -133,7 +133,12 @@ In the API:
 - Accounts and sign-in go only through the `IdentityProvider` in
   `src/identity.ts`; the real one is `src/clerk-identity.ts`.
 - To turn a request down, throw a `Refusal` from `src/refusal.ts` with the status
-  and a message fit to show the person. Check request bodies with `parseRequest`.
+  and a message fit to show the person. Check request bodies and query strings
+  with `parseRequest`. The party, vehicle and gas forms check what was typed
+  against the same schemas first, with `checkInput` from `packages/shared`.
+- Parties, vehicles and gases are never deleted: they are made inactive (a gas is
+  "retired"), and their lists leave them out unless asked. Anything that offers
+  them on a new entry must ask for the default list.
 - Tests replace the clock and the identity provider, and nothing else, with the
   stand-ins in `test/support`.
 - `src/auth.ts` requires sign-in for every request and puts the person in

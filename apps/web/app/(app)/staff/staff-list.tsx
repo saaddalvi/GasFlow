@@ -3,6 +3,8 @@
 import type { StaffMember } from "@gasflow/shared";
 import { ActionDialog } from "@/components/action-dialog";
 import { Field, NewPasswordField } from "@/components/fields";
+import { ListSection } from "@/components/list-section";
+import { Tag } from "@/components/tag";
 import { makeAdmin, removeAccess, removeAdminRole, setPassword } from "./actions";
 
 type Account = NonNullable<StaffMember["account"]>;
@@ -12,35 +14,24 @@ export function StaffList({ staff, ownId }: { staff: StaffMember[]; ownId: strin
 
   return (
     <>
-      <Section title="Staff">
+      <ListSection title="Staff">
         {staff.map(
           ({ account, ...member }) =>
             account && (
               <Member key={member.id} {...member} account={account} isOwn={member.id === ownId} />
             ),
         )}
-      </Section>
+      </ListSection>
       {removed.length > 0 && (
-        <Section title="Access removed">
+        <ListSection title="Access removed">
           {removed.map((member) => (
             <li key={member.id} className="px-5 py-3 text-sm text-slate-500">
               {member.displayName}
             </li>
           ))}
-        </Section>
+        </ListSection>
       )}
     </>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</h2>
-      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-        {children}
-      </ul>
-    </section>
   );
 }
 
@@ -62,8 +53,8 @@ function Member({
       <div className="min-w-0 text-sm">
         <p className="flex flex-wrap items-center gap-2 font-medium">
           <span className="break-words">{displayName}</span>
-          {isAdmin && <Tag className="bg-brand-50 text-brand-700">Admin</Tag>}
-          {isOwn && <Tag className="bg-slate-100 text-slate-600">You</Tag>}
+          {isAdmin && <Tag colour="brand">Admin</Tag>}
+          {isOwn && <Tag>You</Tag>}
         </p>
         {username && <p className="break-all text-slate-500">Username: {username}</p>}
         {/* Shown for anyone who has one, so that a leftover address is never hidden. */}
@@ -155,8 +146,4 @@ function RecoveryEmailDialog({
       />
     </ActionDialog>
   );
-}
-
-function Tag({ className, children }: { className: string; children: React.ReactNode }) {
-  return <span className={`rounded-full px-2 py-0.5 text-xs ${className}`}>{children}</span>;
 }

@@ -9,12 +9,15 @@ export function ActionDialog({
   trigger,
   title,
   description,
+  onOpen,
   ...form
 }: Omit<ActionFormProps, "onCancel" | "onDone"> & {
   /** The words on the button that opens the box. */
   trigger: string;
   title: string;
   description: string;
+  /** Called each time the box is opened. */
+  onOpen?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -23,6 +26,7 @@ export function ActionDialog({
   const close = () => dialog.current?.close();
 
   function open() {
+    onOpen?.();
     setOpening((count) => count + 1);
     dialog.current?.showModal();
   }

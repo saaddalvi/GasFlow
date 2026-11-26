@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "gases" ADD COLUMN     "active" BOOLEAN NOT NULL DEFAULT true,
+ALTER COLUMN "name" SET DATA TYPE CITEXT;

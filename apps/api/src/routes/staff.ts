@@ -4,7 +4,6 @@ import {
   newStaffSchema,
   staffListSchema,
   staffMemberSchema,
-  staffSchema,
 } from "@gasflow/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { AppDependencies } from "../app";
@@ -19,6 +18,7 @@ import {
   removeStaffAdminRole,
   resetStaffPassword,
 } from "../services/staff";
+import { idParam } from "./id-param";
 
 /** What an admin does on the Staff screen. */
 export function staffRoutes(app: FastifyInstance, { db, identity }: AppDependencies): void {
@@ -59,9 +59,5 @@ export function staffRoutes(app: FastifyInstance, { db, identity }: AppDependenc
 
 /** The staff member named in the address. */
 function staffIdFrom(request: FastifyRequest): string {
-  const result = staffSchema.shape.id.safeParse((request.params as { staffId?: unknown }).staffId);
-  if (!result.success) {
-    throw noSuchStaff();
-  }
-  return result.data;
+  return idParam(request, "staffId", noSuchStaff);
 }

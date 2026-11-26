@@ -9,6 +9,8 @@ import { LogoMark } from "./logo-mark";
 
 const LINKS = [
   { href: "/", label: "Gases" },
+  { href: "/parties", label: "Parties" },
+  { href: "/vehicles", label: "Vehicles" },
   { href: "/staff", label: "Staff", adminOnly: true },
 ];
 
@@ -41,7 +43,8 @@ export function NavBar({
 function NavLinks({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   return LINKS.filter((link) => isAdmin || !link.adminOnly).map(({ href, label }) => {
-    const active = pathname === href;
+    // A link stays marked on the pages under it.
+    const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
     return (
       <Link
         key={href}

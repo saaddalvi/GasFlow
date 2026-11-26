@@ -1,45 +1,61 @@
 import { auth } from "@clerk/nextjs/server";
 import type { Gas } from "@gasflow/shared";
+import { EmptyState } from "@/components/empty-state";
+import { ListSection } from "@/components/list-section";
 import { LoadError } from "@/components/load-error";
-import { fetchGases, orNull } from "@/lib/api";
+import { PageHeading } from "@/components/page-heading";
+import { fetchGases, fetchMe, orNull } from "@/lib/api";
+import { AddGasForm, GasActions } from "./gas-forms";
 
 export default async function GasesPage() {
   await auth.protect();
-  const gases = (await orNull(fetchGases()))?.gases ?? null;
+  // Only admins change the list, so only they see retired gases. The API refuses
+  // everyone else whatever is shown here.
+  const isAdmin = (await orNull(fetchMe()))?.isAdmin ?? false;
+  const list = await orNull(fetchGases({ retired: isAdmin }));
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Gases</h1>
-        <p className="text-sm text-slate-500">The gases cylinders are counted by.</p>
-      </div>
-      <GasList gases={gases} />
+      <PageHeading title="Gases" subtitle="The gases cylinders are counted by." />
+      {list ? (
+        <>
+          {isAdmin && <AddGasForm />}
+          <Gases gases={list.gases} isAdmin={isAdmin} />
+        </>
+      ) : (
+        <LoadError>
+          The gases could not be loaded. Check that the API is running, then reload the page.
+        </LoadError>
+      )}
     </div>
   );
 }
 
-function GasList({ gases }: { gases: Gas[] | null }) {
-  if (gases === null) {
-    return (
-      <LoadError>
-        The gases could not be loaded. Check that the API is running, then reload the page.
-      </LoadError>
-    );
-  }
-  if (gases.length === 0) {
-    return (
-      <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
-        There are no gases yet. Run the database seed to add the starting list.
-      </p>
-    );
-  }
+function Gases({ gases, isAdmin }: { gases: Gas[]; isAdmin: boolean }) {
+  const retired = gases.filter((gas) => !gas.active);
+  const inUse = gases.filter((gas) => gas.active);
+
   return (
-    <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+    <>
+      {inUse.length > 0 ? (
+        <GasSection title="In use" gases={inUse} isAdmin={isAdmin} />
+      ) : (
+        <EmptyState>There are no gases in use.</EmptyState>
+      )}
+      {retired.length > 0 && <GasSection title="Retired" gases={retired} isAdmin={isAdmin} />}
+    </>
+  );
+}
+
+function GasSection({ title, gases, isAdmin }: { title: string; gases: Gas[]; isAdmin: boolean }) {
+  return (
+    <ListSection title={title}>
       {gases.map((gas) => (
-        <li key={gas.id} className="px-5 py-3 text-sm">
-          {gas.name}
+        <li key={gas.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+          <span className="min-w-0 break-words text-sm">{gas.name}</span>
+          {isAdmin && <GasActions gas={gas} />}
         </li>
       ))}
-    </ul>
+    </ListSection>
   );
 }

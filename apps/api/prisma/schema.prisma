@@ -18,9 +18,17 @@ enum PartyType {
 }
 
 model Party {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  type      PartyType
-  name      String
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type          PartyType
+  /// Case-insensitive, so that lists sort by name whatever its capitals.
+  name          String    @db.Citext
+  /// A short code. Only the shop has none.
+  abbreviation  String?
+  mobile        String?
+  contactPerson String?   @map("contact_person")
+  address       String?
+  notes         String?
+  active        Boolean   @default(true)
 
   // The agency has exactly one shop.
   @@unique([type], map: "parties_one_shop", where: raw("type = 'shop'"))
@@ -28,9 +36,12 @@ model Party {
 }
 
 model Gas {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String   @unique
-  sortOrder Int      @map("sort_order")
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Case-insensitive, so that no two gases differ only in capitals.
+  name      String  @unique @db.Citext
+  sortOrder Int     @map("sort_order")
+  /// False once an admin retires the gas. A gas is never deleted.
+  active    Boolean @default(true)
 
   @@map("gases")
 }
@@ -44,4 +55,14 @@ model Staff {
   displayName String @map("display_name")
 
   @@map("staff")
+}
+
+model Vehicle {
+  id     String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Case-insensitive, so that lists sort by plate whatever its capitals.
+  plate  String  @db.Citext
+  label  String?
+  active Boolean @default(true)
+
+  @@map("vehicles")
 }

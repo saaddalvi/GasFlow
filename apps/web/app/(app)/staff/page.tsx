@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LoadError } from "@/components/load-error";
+import { PageHeading } from "@/components/page-heading";
 import { fetchMe, fetchStaff, orNull } from "@/lib/api";
 import { AddStaffForm } from "./add-staff-form";
 import { StaffList } from "./staff-list";
@@ -21,10 +22,7 @@ export default async function StaffPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Staff</h1>
-        <p className="text-sm text-slate-500">Who can sign in, and who is an admin.</p>
-      </div>
+      <PageHeading title="Staff" subtitle="Who can sign in, and who is an admin." />
       {me && list ? (
         <>
           <AddStaffForm />

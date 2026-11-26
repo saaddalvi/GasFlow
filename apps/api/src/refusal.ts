@@ -1,3 +1,4 @@
+import { checkInput } from "@gasflow/shared";
 import type { z } from "zod";
 
 /**
@@ -19,9 +20,9 @@ export function parseRequest<Schema extends z.ZodType>(
   schema: Schema,
   input: unknown,
 ): z.output<Schema> {
-  const result = schema.safeParse(input ?? {});
-  if (!result.success) {
-    throw new Refusal(400, result.error.issues[0]?.message ?? "The request is not valid.");
+  const checked = checkInput(schema, input);
+  if (checked.problem !== undefined) {
+    throw new Refusal(400, checked.problem);
   }
-  return result.data;
+  return checked.data;
 }

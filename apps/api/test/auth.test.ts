@@ -1,16 +1,20 @@
 import { expect, test } from "vitest";
 import { startTestApp } from "./support/test-app";
 
-test.each(["/api/gases", "/api/shop", "/api/today", "/api/no-such-thing"])(
-  "a signed-out request for %s is refused",
-  async (url) => {
-    const { app } = await startTestApp();
+test.each([
+  "/api/gases",
+  "/api/parties",
+  "/api/shop",
+  "/api/today",
+  "/api/vehicles",
+  "/api/no-such-thing",
+])("a signed-out request for %s is refused", async (url) => {
+  const { app } = await startTestApp();
 
-    const response = await app.inject({ method: "GET", url });
+  const response = await app.inject({ method: "GET", url });
 
-    expect(response.statusCode).toBe(401);
-  },
-);
+  expect(response.statusCode).toBe(401);
+});
 
 test.each([
   ["a token nobody was given", "Bearer made-up"],

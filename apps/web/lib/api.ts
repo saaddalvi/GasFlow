@@ -1,21 +1,50 @@
 import { auth } from "@clerk/nextjs/server";
 import {
   gasListSchema,
+  partyListSchema,
+  partySchema,
   refusalSchema,
   shopSchema,
   staffListSchema,
   staffSchema,
+  vehicleListSchema,
   type GasList,
+  type Party,
+  type PartyList,
+  type PartyListQuery,
   type Shop,
   type Staff,
   type StaffList,
+  type VehicleList,
 } from "@gasflow/shared";
+import { refresh } from "next/cache";
+import { partyListSearch } from "./party-list-search";
 
 // Everything here runs on the web server, never in the browser, and asks the API
 // on behalf of the signed-in staff member.
 
-export async function fetchGases(): Promise<GasList> {
-  return gasListSchema.parse(await getJson("/api/gases"));
+/** The gases in use, and the retired ones too if asked for. */
+export async function fetchGases({ retired = false } = {}): Promise<GasList> {
+  return gasListSchema.parse(await getJson(`/api/gases?retired=${retired}`));
+}
+
+export async function fetchParties(query: PartyListQuery): Promise<PartyList> {
+  return partyListSchema.parse(await getJson(`/api/parties?${partyListSearch(query)}`));
+}
+
+/** The party, or undefined if there is none with this id. */
+export async function fetchParty(partyId: string): Promise<Party | undefined> {
+  const path = `/api/parties/${encodeURIComponent(partyId)}`;
+  const response = await askApi(path);
+  if (response.status === 404) {
+    return undefined;
+  }
+  return partySchema.parse(await readJson(response, path));
+}
+
+/** Every vehicle, inactive ones too. */
+export async function fetchVehicles(): Promise<VehicleList> {
+  return vehicleListSchema.parse(await getJson("/api/vehicles?inactive=true"));
 }
 
 export async function fetchShop(): Promise<Shop> {
@@ -30,16 +59,33 @@ export async function fetchStaff(): Promise<StaffList> {
   return staffListSchema.parse(await getJson("/api/staff"));
 }
 
-/** How a change went: nothing to say, or why it was not made. */
+/** How a change went: why it was not made, or where to go now that it is. */
 export interface Outcome {
   error?: string;
+  goTo?: string;
 }
 
-/** Asks the API to change something. */
+/**
+ * Asks the API to change something, for a Server Function to answer with. The
+ * page is then loaded again, because even after a refusal it may be out of date.
+ */
 export async function sendChange(
-  method: "POST" | "PUT" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   body?: unknown,
+  /** Makes the outcome from what the API answered, once the change is made. */
+  whenMade: (answer: Response) => Promise<Outcome> = () => Promise.resolve({}),
+): Promise<Outcome> {
+  const outcome = await askForChange(method, path, body, whenMade);
+  refresh();
+  return outcome;
+}
+
+async function askForChange(
+  method: string,
+  path: string,
+  body: unknown,
+  whenMade: (answer: Response) => Promise<Outcome>,
 ): Promise<Outcome> {
   try {
     const response = await askApi(path, {
@@ -48,7 +94,7 @@ export async function sendChange(
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (response.ok) {
-      return {};
+      return await whenMade(response);
     }
     // A refusal says why, in words for the person. A server error does not.
     if (response.status < 500) {
@@ -70,7 +116,10 @@ export function orNull<T>(answer: Promise<T>): Promise<T | null> {
 }
 
 async function getJson(path: string): Promise<unknown> {
-  const response = await askApi(path);
+  return readJson(await askApi(path), path);
+}
+
+async function readJson(response: Response, path: string): Promise<unknown> {
   if (!response.ok) {
     throw new Error(`The API answered ${response.status} for ${path}.`);
   }

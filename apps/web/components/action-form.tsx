@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 import type { Outcome } from "@/lib/api";
 import { buttonStyles } from "./button-styles";
@@ -17,7 +18,8 @@ export interface ActionFormProps {
 
 /**
  * A form for one change. It keeps what was typed and shows the reason when the
- * change is refused, and starts again with fresh fields when the change is made.
+ * change is refused. When the change is made it goes where the outcome says, or
+ * else starts again with fresh fields.
  */
 export function ActionForm({
   action,
@@ -30,6 +32,7 @@ export function ActionForm({
   const [error, setError] = useState<string>();
   const [changesMade, setChangesMade] = useState(0);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   // Sent by hand, because a form's own `action` empties the fields even after a refusal.
   function submit(event: React.SyntheticEvent<HTMLFormElement>) {
@@ -37,11 +40,15 @@ export function ActionForm({
     const form = new FormData(event.currentTarget);
     setError(undefined);
     startTransition(async () => {
-      const outcome = await action(form).catch(() => ({
+      const outcome = await action(form).catch((): Outcome => ({
         error: "The web app could not be reached. Check your connection and try again.",
       }));
       setError(outcome.error);
-      if (!outcome.error) {
+      const { goTo } = outcome;
+      if (goTo) {
+        // The button stays disabled until the next page is up.
+        startTransition(() => router.push(goTo));
+      } else if (!outcome.error) {
         // Empties the fields, and hides any password that was being shown.
         setChangesMade((count) => count + 1);
         onDone?.();
