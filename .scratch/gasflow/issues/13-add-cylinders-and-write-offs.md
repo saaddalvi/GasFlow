@@ -6,14 +6,14 @@
 
 **Status:** ready-for-agent
 
-- [ ] An admin can record add cylinders to the shop with gas lines, fill states and an optional supplier
-- [ ] An admin can write off from the shop or a refiller with gas lines and a required reason (scrapped or lost, with notes)
-- [ ] Both are numbered automatically, with a different prefix for each kind
-- [ ] Staff who are not admins cannot create, correct or cancel them
-- [ ] An admin can correct and cancel both, with revision history
-- [ ] The Stock report totals rise and fall accordingly
-- [ ] Neither a supplier nor the outside side of these bills ever appears as a holding, in totals or as a negative count
-- [ ] The bill list and bill page show both kinds correctly
+- [x] An admin can record add cylinders to the shop with gas lines, fill states and an optional supplier
+- [x] An admin can write off from the shop or a refiller with gas lines and a required reason (scrapped or lost, with notes)
+- [x] Both are numbered automatically, with a different prefix for each kind
+- [x] Staff who are not admins cannot create, correct or cancel them
+- [x] An admin can correct and cancel both, with revision history
+- [x] The Stock report totals rise and fall accordingly
+- [x] Neither a supplier nor the outside side of these bills ever appears as a holding, in totals or as a negative count
+- [x] The bill list and bill page show both kinds correctly
 
 ## Comments
 
@@ -71,3 +71,9 @@ Run in headless Chrome through the Playwright MCP against commit `515afcd` (the 
 No page errors were raised, and the API answered no request with a server error. The one console error was a missing `favicon.ico`.
 
 Still to do: enter a write-off on a real phone. Safari and Firefox have not been tried.
+
+**27 November 2026: completed** in commit `515afcd`.
+
+- The project owner asked for the boxes to be ticked and the ticket marked complete. No check on a real phone is recorded here. The phone check was on the emulated phone described above.
+- `pnpm check`, with 560 tests, and `pnpm build` passed on the code committed in `515afcd`, which has not changed since.
+- The decisions listed for the project owner are not recorded as settled.
