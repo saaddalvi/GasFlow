@@ -105,7 +105,7 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
           submitLabel="Save bill"
           onCancel={() => router.push(BILLS_PATH)}
         >
-          <div className="grid items-start gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
             <BillNumberFields
               paperKind={paperKind}
               number={number}
