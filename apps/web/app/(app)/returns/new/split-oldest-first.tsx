@@ -47,7 +47,7 @@ export function FillOldestFirst({
   return (
     <div className="space-y-2 rounded-lg bg-slate-50 p-3">
       {gas && (
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,6rem)] items-end gap-2 sm:grid-cols-[minmax(0,14rem)_6rem_auto]">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,5rem)] items-end gap-2 sm:grid-cols-[minmax(0,14rem)_6rem_auto] sm:justify-start">
           <SelectField
             label="Gas"
             value={gas.id}

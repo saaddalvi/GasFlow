@@ -17,7 +17,7 @@ export const newAllocationSchema = z.object(
     quantity: quantitySchema,
     fillState: fillStateSchema.default("empty"),
   },
-  "Split in each row.",
+  "Fill in each row.",
 );
 
 export type NewAllocation = z.infer<typeof newAllocationSchema>;

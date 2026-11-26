@@ -354,7 +354,7 @@ function PendingRowFields({
           </button>
           <div className="col-span-2 min-w-0 min-[26rem]:col-span-1">
             <SelectField
-              label="Split state"
+              label="Fill state"
               value={entry.fillState}
               onChange={(event) =>
                 onChange({ ...entry, fillState: event.target.value as FillState })
