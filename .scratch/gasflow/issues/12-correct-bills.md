@@ -6,15 +6,15 @@
 
 **Status:** ready-for-agent
 
-- [ ] Dispatches, sends to a refiller, returns from a refiller and opening stock can be corrected, and all figures update
-- [ ] Returns cannot be corrected, only cancelled
-- [ ] Staff can correct only bills they entered today (Indian Standard Time); admins can correct any; only admins can correct opening stock
-- [ ] Number and start date rules apply to corrections
-- [ ] Each correction keeps the earlier version; the bill page shows an "Edited" mark and lists versions, each viewable with who changed it and when
-- [ ] Lines that have allocations keep their identity through a correction
-- [ ] A correction is refused if it changes the customer of a bill with allocations, removes an allocated gas, lowers a gas below its allocated quantity, or moves the date after an allocated return; the refusal links to each blocking bill
-- [ ] A permitted correction, such as raising a quantity, updates pending
-- [ ] A correction and a return against the same bill sent at the same moment cannot leave a bill over-returned
+- [x] Dispatches, sends to a refiller, returns from a refiller and opening stock can be corrected, and all figures update
+- [x] Returns cannot be corrected, only cancelled
+- [x] Staff can correct only bills they entered today (Indian Standard Time); admins can correct any; only admins can correct opening stock
+- [x] Number and start date rules apply to corrections
+- [x] Each correction keeps the earlier version; the bill page shows an "Edited" mark and lists versions, each viewable with who changed it and when
+- [x] Lines that have allocations keep their identity through a correction
+- [x] A correction is refused if it changes the customer of a bill with allocations, removes an allocated gas, lowers a gas below its allocated quantity, or moves the date after an allocated return; the refusal links to each blocking bill
+- [x] A permitted correction, such as raising a quantity, updates pending
+- [x] A correction and a return against the same bill sent at the same moment cannot leave a bill over-returned
 
 ## Comments
 
@@ -63,3 +63,29 @@ For later tickets:
 - Tickets 13 and 14: new bill types need adding to `billCorrectionSchema` and `correctBill`, which takes any bill not copied from paper to be opening stock. A customer write-off goes in `whyUncorrectable`. The refusals speak of returns only, and would name a write-off as one.
 - Ticket 13: a field added to `billContentSchema` needs a default, or versions saved before it will not load.
 - Ticket 17: a correction can leave an inactive party holding cylinders.
+
+**27 November 2026: checks run in Chrome. All passed. A real phone is still to do.**
+
+Run in Chrome through the Playwright MCP against commit `963ce5f` (the code at `ce44550`), signed in with real Clerk development accounts (`admin` and `test1`). The app and the database were copies, and the figures were made up. Test bills were created through the API; the corrections below were made on screen.
+
+- **Who is offered Correct bill: passed.** Staff were offered it on three bills they entered that day, and not on an older one, the admin's, opening stock or a return. Each of those correction pages said why, and the API refused. The admin was offered it on all but the return. The older bill was made by moving its entry time back a day in the copy.
+- **Send to refiller: passed.** The form started with what the bill said. A taken number was warned of and refused, and the bill's own was not warned of. Its refiller, number, vehicle, notes and quantity were changed.
+- **Return from refiller: passed.** The same for the slip number. A quantity was lowered and a line added. The Stock report followed both refiller corrections.
+- **A dispatch with a return: passed.** A later date, another customer and too few cylinders were each refused with a link to the return, and the link opened it.
+- **Admin: passed.** An older bill and opening stock were corrected, and each showed its earlier version.
+- **Correcting on a phone: passed on an emulated phone** (touch, 390 wide). A dispatch was refused, then saved, and its earlier version opened.
+
+No sideways scrolling on the refiller bills' pages and correction pages or opening stock's at 320, 768 and 1280, or on the dispatch's at 390. No page errors were raised, and the API answered no request with a server error. The one console error was a missing `favicon.ico`.
+
+Seen:
+
+- In the **Versions** list, an opened earlier version lost its rounded bottom corners. Fixed afterwards in `d83cc12`.
+- On the phone, a refusal appears half below the screen, so the link to the bill in the way has to be scrolled to. Not fixed.
+
+Still to do: correct a bill on a real phone. Safari and Firefox have not been tried.
+
+**27 November 2026: completed** in commits `963ce5f` and `d83cc12`. Not pushed when this was written, so CI has not run on them.
+
+- The project owner asked for the boxes to be ticked. No results of a check on a real phone are recorded here. The phone check was on the emulated phone described above.
+- `pnpm check`, with 527 tests, and `pnpm build` pass with the corner fix. The fix was looked at in Chrome on a copy of the box's markup with the app's built styles, not on the bill page itself.
+- The decisions listed for the project owner are not recorded as settled.
