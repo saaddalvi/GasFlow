@@ -18,3 +18,44 @@
 - [ ] The report has a date picker, month-end shortcuts and previous and next day; dates before the start date show nothing
 - [ ] Negative counts are shown in a red cell
 - [ ] API tests enter opening stock and assert the report figures
+
+## Comments
+
+**26 November 2026: built in commit `bb5de85`, waiting on a check by hand.** Not pushed, so CI has not run on it.
+
+Still to do, signed in with real accounts. Run `pnpm db:migrate` first.
+
+- As an admin, set the start date. It cannot be changed in the app, so choose it with care even on the development database.
+- Enter opening stock for the shop, a customer and a refiller, and view an entry.
+- As staff, check that entries can be listed and viewed, and that there is no entry form.
+- On the Stock report, use the date picker, the month-end shortcuts, previous and next day, and a date before the start date.
+- Check by hand in the browsers and on the phones the agency will use. Safari, Firefox and a real phone have not been tried.
+
+Checked so far:
+
+- `pnpm check` (200 tests) and `pnpm build` pass.
+- The screens were driven in a headless Chromium browser at phone, tablet and desktop widths, in a throwaway copy of the app with sign-in replaced by the identity stand-in and its own database. Nothing was run against Clerk.
+- No bill can yet make a count negative, so the red cell was checked only with rows put straight into a throwaway database. Ticket 06 can check it through the app and the API tests.
+
+For the project owner to decide:
+
+- **Can the start date be changed once opening stock exists?** The spec leaves this open. For now it is set once, and a mistake can only be undone in the database.
+- A start date after today is refused, because cylinders cannot be counted on a day that has not come. This also means it cannot be set the evening before.
+- A start date before 2000 is refused. A bill takes at most 100 lines, and a line at most 100,000 cylinders.
+- Opening stock numbers look like `OPN-20261101-001`, from the start date. The client has yet to supply the prefix.
+- An inactive party and a retired gas are refused on opening stock.
+- A wrong opening stock cannot be fixed until tickets 11 (cancel) and 12 (correct).
+- The opening stock page is at `/bills/opening-stock/new`.
+- The glossary has no entry for posted.
+
+Known limits:
+
+- Dozens of saves arriving at once over a slow database link can fail with a server error, saving nothing. Saves of one date wait their turn for a number, and give up after a few seconds. Check this against Neon at go-live.
+- If a colleague sets the start date while another admin's box is open, the box closes without saying why. The page then shows the date that was set.
+- A long party name with no spaces probably widens the party page on a phone, as it did the bill page before that was fixed. Seen only on the bill page.
+
+For later tickets:
+
+- Only `apps/api/src/services/ledger.ts` changes bills. A bill moves cylinders from `fromPartyId` to `toPartyId`; a blank side is outside the business.
+- The Stock report already subtracts what leaves a party, which no test can reach until there is a dispatch.
+- Ticket 12: bill lines are unique by bill and line number, so renumbering lines that stay needs two steps.
