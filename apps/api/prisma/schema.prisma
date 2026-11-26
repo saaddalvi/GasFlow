@@ -63,11 +63,11 @@ model Setup {
 /// bills can go on showing who entered and cancelled them. The admin role is not
 /// stored here; the identity provider holds it.
 model Staff {
-  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  identityId     String @unique @map("identity_id")
-  displayName    String @map("display_name")
-  billsEntered   Bill[] @relation("bills_entered")
-  billsCancelled Bill[] @relation("bills_cancelled")
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  identityId     String         @unique @map("identity_id")
+  displayName    String         @map("display_name")
+  billsEntered   Bill[]         @relation("bills_entered")
+  billsCancelled Bill[]         @relation("bills_cancelled")
   billsCorrected BillRevision[]
 
   @@map("staff")
@@ -90,6 +90,8 @@ enum BillType {
   send_to_refiller
   return_from_refiller
   return_from_customer
+  add_cylinders
+  write_off
 
   @@map("bill_type")
 }
@@ -112,6 +114,14 @@ enum CancelReason {
   @@map("cancel_reason")
 }
 
+/// Why cylinders left the business for good.
+enum WriteOffReason {
+  scrapped
+  lost
+
+  @@map("write_off_reason")
+}
+
 enum FillState {
   filled
   empty
@@ -131,39 +141,41 @@ enum PaperKind {
 /// A dated record of cylinders moving between parties, or joining or leaving the
 /// business. Only the bill ledger changes bills. Only posted ones count.
 model Bill {
-  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  type          BillType
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type           BillType
   /// Case-insensitive, so that no two typed numbers differ only in capitals.
-  number        String        @db.Citext
+  number         String          @db.Citext
   /// Set on bills numbered from the agency's own paper, and only on those.
-  paperKind     PaperKind?    @map("paper_kind")
-  date          DateTime      @db.Date
-  status        BillStatus    @default(posted)
+  paperKind      PaperKind?      @map("paper_kind")
+  date           DateTime        @db.Date
+  status         BillStatus      @default(posted)
   /// Whom the cylinders leave. Null when they join the business.
-  fromPartyId   String?       @map("from_party_id") @db.Uuid
+  fromPartyId    String?         @map("from_party_id") @db.Uuid
   /// Who receives them. Null when they leave the business.
-  toPartyId     String?       @map("to_party_id") @db.Uuid
-  vehicleId     String?       @map("vehicle_id") @db.Uuid
-  notes         String?
+  toPartyId      String?         @map("to_party_id") @db.Uuid
+  vehicleId      String?         @map("vehicle_id") @db.Uuid
+  notes          String?
   /// The paper return slip's number, noted on a return from a customer. Unlike
   /// the bill number, it need not be unique.
-  slipNumber    String?       @map("slip_number")
-  enteredById   String        @map("entered_by_id") @db.Uuid
-  enteredAt     DateTime      @map("entered_at") @db.Timestamptz(3)
-  fromParty     Party?        @relation("bills_from", fields: [fromPartyId], references: [id], onDelete: Restrict)
-  toParty       Party?        @relation("bills_to", fields: [toPartyId], references: [id], onDelete: Restrict)
-  vehicle       Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  slipNumber     String?         @map("slip_number")
+  /// Set on write-offs, and only on those.
+  writeOffReason WriteOffReason? @map("write_off_reason")
+  enteredById    String          @map("entered_by_id") @db.Uuid
+  enteredAt      DateTime        @map("entered_at") @db.Timestamptz(3)
+  fromParty      Party?          @relation("bills_from", fields: [fromPartyId], references: [id], onDelete: Restrict)
+  toParty        Party?          @relation("bills_to", fields: [toPartyId], references: [id], onDelete: Restrict)
+  vehicle        Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   /// These four say who cancelled the bill, when and why. A check in the
   /// migration requires all but the notes on a cancelled bill, and allows none of
   /// the four on a posted one.
-  cancelReason  CancelReason? @map("cancel_reason")
-  cancelNotes   String?       @map("cancel_notes")
-  cancelledById String?       @map("cancelled_by_id") @db.Uuid
-  cancelledAt   DateTime?     @map("cancelled_at") @db.Timestamptz(3)
-  enteredBy     Staff         @relation("bills_entered", fields: [enteredById], references: [id])
-  cancelledBy   Staff?        @relation("bills_cancelled", fields: [cancelledById], references: [id], onDelete: Restrict)
-  lines         BillLine[]
-  revisions     BillRevision[]
+  cancelReason   CancelReason?   @map("cancel_reason")
+  cancelNotes    String?         @map("cancel_notes")
+  cancelledById  String?         @map("cancelled_by_id") @db.Uuid
+  cancelledAt    DateTime?       @map("cancelled_at") @db.Timestamptz(3)
+  enteredBy      Staff           @relation("bills_entered", fields: [enteredById], references: [id])
+  cancelledBy    Staff?          @relation("bills_cancelled", fields: [cancelledById], references: [id], onDelete: Restrict)
+  lines          BillLine[]
+  revisions      BillRevision[]
 
   // A party has one opening stock. A cancelled one makes way for another.
   @@unique([toPartyId], map: "bills_one_opening_stock_per_party", where: raw("type = 'opening_stock' AND status = 'posted'"))

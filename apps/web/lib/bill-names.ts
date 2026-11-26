@@ -6,6 +6,7 @@ import {
   type BillType,
   type CancelReason,
   type FillState,
+  type WriteOffReason,
 } from "@gasflow/shared";
 
 export const BILL_TYPE_NAMES: Record<BillType, string> = {
@@ -14,6 +15,13 @@ export const BILL_TYPE_NAMES: Record<BillType, string> = {
   send_to_refiller: "Send to refiller",
   return_from_refiller: "Return from refiller",
   return_from_customer: "Return",
+  add_cylinders: "Add cylinders",
+  write_off: "Write-off",
+};
+
+export const WRITE_OFF_REASON_NAMES: Record<WriteOffReason, string> = {
+  scrapped: "Scrapped",
+  lost: "Lost",
 };
 
 export const FILL_STATE_NAMES: Record<FillState, string> = {
@@ -36,10 +44,19 @@ export const CANCEL_REASON_NAMES: Record<CancelReason, string> = {
   other: "Other",
 };
 
-/** What sort of bill it is, with its paper kind if it has one, such as "Dispatch · Cash memo". */
-export function describeBillType({ type, paperKind }: Pick<Bill, "type" | "paperKind">): string {
-  const name = BILL_TYPE_NAMES[type];
-  return paperKind ? `${name} · ${PAPER_KIND_NAMES[paperKind]}` : name;
+/**
+ * What sort of bill it is, with its paper kind or reason if it has one, such as
+ * "Dispatch · Cash memo" or "Write-off · Lost".
+ */
+export function describeBillType({
+  type,
+  paperKind,
+  writeOffReason,
+}: Pick<Bill, "type" | "paperKind" | "writeOffReason">): string {
+  const detail =
+    (paperKind && PAPER_KIND_NAMES[paperKind]) ??
+    (writeOffReason && WRITE_OFF_REASON_NAMES[writeOffReason]);
+  return [BILL_TYPE_NAMES[type], detail].filter(Boolean).join(" · ");
 }
 
 /** The cylinders of each gas on these lines, such as "Argon 2, Nitrogen 5". */

@@ -25,6 +25,7 @@ test("the list shows each bill's number, date, type, from and to, lines and stat
         status: "posted",
         from: sent.from,
         to: sent.to,
+        writeOffReason: null,
         lines: sent.lines,
       },
       {
@@ -36,6 +37,7 @@ test("the list shows each bill's number, date, type, from and to, lines and stat
         status: "posted",
         from: null,
         to: opening.to,
+        writeOffReason: null,
         lines: opening.lines,
       },
     ],
@@ -89,4 +91,31 @@ test.each(["0", "-1", "two", "1.5"])("there is no page %s", async (page) => {
 
   expect(response.statusCode).toBe(400);
   expect(response.json()).toMatchObject({ message: "There is no such page." });
+});
+
+test("the list shows cylinders added and written off, with who is on each side", async () => {
+  const { admin, shop, addParty, addCylindersFor, writeOffFor, postBill, bills } =
+    await startAgency();
+  const supplier = await addParty("supplier", "Sharp Cylinders");
+  await postBill(addCylindersFor({ date: "2026-11-20" }), admin);
+  await postBill(addCylindersFor({ date: "2026-11-21", supplierId: supplier.id }), admin);
+  await postBill(writeOffFor({ writeOffReason: "lost" }), admin);
+
+  expect((await bills()).bills).toMatchObject([
+    {
+      type: "write_off",
+      number: "WOF-20261126-001",
+      from: { id: shop.id },
+      to: null,
+      writeOffReason: "lost",
+    },
+    {
+      type: "add_cylinders",
+      number: "ADD-20261121-001",
+      from: { id: supplier.id, type: "supplier" },
+      to: { id: shop.id },
+      writeOffReason: null,
+    },
+    { type: "add_cylinders", number: "ADD-20261120-001", from: null, to: { id: shop.id } },
+  ]);
 });

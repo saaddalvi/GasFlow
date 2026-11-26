@@ -1,6 +1,6 @@
-import type { Bill, BillContent, BillParty } from "@gasflow/shared";
+import type { Bill, BillParty } from "@gasflow/shared";
 import Link from "next/link";
-import { FILL_STATE_NAMES } from "@/lib/bill-names";
+import { FILL_STATE_NAMES, WRITE_OFF_REASON_NAMES } from "@/lib/bill-names";
 import { BILL_PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { vehicleName } from "@/lib/vehicle-names";
 
@@ -23,17 +23,23 @@ export function DetailList({ details }: { details: [label: string, value: React.
   );
 }
 
-/** Who the cylinders moved between, what carried them and what was noted. */
+/** Who the cylinders moved between and why, what carried them and what was noted. */
 export function movementDetails({
+  type,
   from,
   to,
+  writeOffReason,
   vehicle,
   notes,
-}: Pick<BillContent, "from" | "to" | "vehicle" | "notes">): [string, React.ReactNode][] {
+}: Pick<Bill, "type" | "from" | "to" | "writeOffReason" | "vehicle" | "notes">): [
+  string,
+  React.ReactNode,
+][] {
   return [
     ["From", from && <PartyName party={from} />],
     // Opening stock names only the party that held it.
-    [from ? "To" : "Party", to && <PartyName party={to} />],
+    [type === "opening_stock" ? "Party" : "To", to && <PartyName party={to} />],
+    ["Write-off reason", writeOffReason && WRITE_OFF_REASON_NAMES[writeOffReason]],
     ["Vehicle", vehicle && vehicleName(vehicle)],
     ["Notes", notes && <Typed text={notes} />],
   ];

@@ -2,7 +2,7 @@
 
 import type { Bill } from "@gasflow/shared";
 import { useLastGiven } from "@/lib/use-last-given";
-import { BillForm, type FormChoices, type PaperBill } from "../../new/bill-form";
+import { BillForm, type FormBill, type FormChoices } from "../../new/bill-form";
 import { OpeningStockCorrectionForm } from "./opening-stock-correction-form";
 
 /** A bill that can be corrected, and what its form offers. */
@@ -33,6 +33,6 @@ export function CorrectionForm({
   ) : (
     // A return from a customer is never offered here, which leaves the types the
     // form is for.
-    <BillForm key={bill.id} bill={bill as PaperBill} choices={choices} />
+    <BillForm key={bill.id} bill={bill as FormBill} choices={choices} />
   );
 }

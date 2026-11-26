@@ -30,6 +30,7 @@ export function SearchPicker<Answer, Option extends Choice>({
   read,
   detail,
   focused = false,
+  optional = false,
   children,
 }: {
   label: string;
@@ -47,6 +48,8 @@ export function SearchPicker<Answer, Option extends Choice>({
   detail?: (option: Option) => React.ReactNode;
   /** Whether the box takes the focus when it appears. */
   focused?: boolean;
+  /** Whether it may be left blank. Otherwise its form is to see that one is chosen. */
+  optional?: boolean;
   /** What sits beside the box, given what has been typed and how to close the list. */
   children?: (typed: string, close: () => void) => React.ReactNode;
 }) {
@@ -73,6 +76,14 @@ export function SearchPicker<Answer, Option extends Choice>({
   useEffect(() => {
     list.current?.children[marked]?.scrollIntoView({ block: "nearest" });
   }, [marked]);
+
+  // A name typed but not chosen would be saved as blank, so the form is held back.
+  const unchosen = optional && !chosen && typed.trim() !== "";
+  useEffect(() => {
+    input.current?.setCustomValidity(
+      unchosen ? `Choose a ${noun} from the list, or clear the box.` : "",
+    );
+  }, [unchosen, noun]);
 
   // The list always opens, and changes, with its first option marked.
   function show() {
@@ -105,8 +116,8 @@ export function SearchPicker<Answer, Option extends Choice>({
   }
 
   return (
-    <Labelled label={label} required>
-      {({ id: inputId }) => (
+    <Labelled label={label} hint={optional ? "Optional." : undefined} required={!optional}>
+      {({ id: inputId, "aria-describedby": hintId }) => (
         <>
           <div className="relative flex min-w-0 flex-1">
             <input
@@ -117,7 +128,8 @@ export function SearchPicker<Answer, Option extends Choice>({
               aria-controls={listId}
               aria-autocomplete="list"
               aria-activedescendant={expanded ? optionId(marked) : undefined}
-              aria-required="true"
+              aria-required={!optional}
+              aria-describedby={hintId}
               autoComplete="off"
               placeholder="Search by name"
               value={chosen ? chosen.name : typed}

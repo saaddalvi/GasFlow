@@ -4,6 +4,7 @@ import {
   pendingBillName,
   whyNotCancel,
   whyNotCorrect,
+  whyNotEnter,
   whyUncorrectable,
   type BillContent,
   type BillCorrection,
@@ -96,36 +97,44 @@ const NAMED_PARTY = {
   send_to_refiller: { type: "refiller", rule: "A send to refiller goes to a refiller." },
   return_from_refiller: { type: "refiller", rule: "A return from refiller comes from a refiller." },
   return_from_customer: { type: "customer", rule: "Empties are received from a customer." },
+  add_cylinders: { type: "supplier", rule: "Cylinders are added from a supplier." },
+  write_off: { type: "refiller", rule: "A write-off is from the shop or a refiller." },
 } as const;
 
 /**
- * Records a bill entered from paper, moving cylinders between the shop and a
- * customer or refiller, and gives its id. Whoever the cylinders leave may be
- * recorded as holding fewer than are moved.
+ * Records a bill entered on the new bill form, and gives its id. It moves cylinders
+ * between the shop and a customer or refiller, or into or out of the business.
+ * Whoever the cylinders leave may be recorded as holding fewer than are moved.
  */
-export function enterBill(
+export async function enterBill(
   db: Database,
   clock: Clock,
   staff: Staff,
   bill: NewBill,
 ): Promise<string> {
-  const { type, number, date, vehicleId, notes, lines } = bill;
-  const { partyId, named, paperKind, takenNumber } = paperDetails(bill);
+  const { type, date, notes, lines } = bill;
+  const notAllowed = whyNotEnter(type, staff);
+  if (notAllowed) {
+    throw new Refusal(403, notAllowed);
+  }
+  const { partyId, named, columns, numbering } = entryDetails(bill);
   const save = db.$transaction(async (tx) => {
     await refuseUnrecordedDate(tx, date);
-    refuseUnusableParty(await lockParty(tx, partyId), named);
-    if (vehicleId) {
-      await refuseUnusableVehicle(tx, vehicleId);
+    if (partyId) {
+      refuseUnusableParty(await lockParty(tx, partyId), named);
+    }
+    if (columns.vehicleId) {
+      await refuseUnusableVehicle(tx, columns.vehicleId);
     }
     await refuseUnusableGases(tx, lines);
     const saved = await tx.bill.create({
       data: {
         type,
-        paperKind,
-        number,
+        ...columns,
+        number:
+          "typed" in numbering ? numbering.typed : await issueNumber(tx, numbering.prefix, date),
         date: toDatabaseDate(date),
         ...sides(type, partyId, (await getShop(tx)).id),
-        vehicleId,
         notes,
         enteredById: staff.id,
         enteredAt: clock.now(),
@@ -135,7 +144,7 @@ export function enterBill(
     });
     return saved.id;
   });
-  return refusingTakenNumber(save, takenNumber);
+  return refusingTakenNumber(save, numbering);
 }
 
 /**
@@ -152,8 +161,8 @@ export function correctBill(
   correction: BillCorrection,
 ): Promise<void> {
   // Opening stock is corrected in its lines alone.
-  const paper =
-    correction.type === "opening_stock" ? null : { ...correction, ...paperDetails(correction) };
+  const entry =
+    correction.type === "opening_stock" ? null : { ...correction, ...entryDetails(correction) };
   const save = db.$transaction(async (tx) => {
     const bill = await lockBill(tx, billId);
     const uncorrectable = whyUncorrectable(bill);
@@ -169,17 +178,21 @@ export function correctBill(
     }
     const shop = await getShop(tx);
     const namedBefore = partyConcerned(bill, shop.id);
-    const partyId = paper?.partyId ?? namedBefore;
+    // Whom it names already, which the shop never counts as: a form never names it.
+    const alreadyNamed = namedBefore === shop.id ? null : namedBefore;
+    // As partyConcerned will say of the bill once corrected.
+    const concerned = entry ? (entry.partyId ?? shop.id) : namedBefore;
     // The party it names now and the one it is to name, as returns may be matched
     // to it by either of them in the meantime.
-    const parties = await lockParties(tx, [namedBefore, partyId]);
-    if (paper) {
-      await refuseUnrecordedDate(tx, paper.date);
-      if (partyId !== namedBefore) {
-        refuseUnusableParty(parties.get(partyId)!, paper.named);
+    const parties = await lockParties(tx, [namedBefore, concerned]);
+    if (entry) {
+      await refuseUnrecordedDate(tx, entry.date);
+      if (entry.partyId && entry.partyId !== alreadyNamed) {
+        refuseUnusableParty(parties.get(entry.partyId)!, entry.named);
       }
-      if (paper.vehicleId && paper.vehicleId !== bill.vehicleId) {
-        await refuseUnusableVehicle(tx, paper.vehicleId);
+      const { vehicleId } = entry.columns;
+      if (vehicleId && vehicleId !== bill.vehicleId) {
+        await refuseUnusableVehicle(tx, vehicleId);
       }
     }
     const gasesOnBill = new Set(bill.lines.map((line) => line.gasId));
@@ -191,21 +204,21 @@ export function correctBill(
     // it is read after.
     const matched = await findAllocationsToBill(tx, billId);
     refuseContradictingReturns(pendingBillName(bill), matched, {
-      changesParty: partyId !== namedBefore,
-      date: paper?.date,
+      changesParty: concerned !== namedBefore,
+      date: entry?.date,
       lines: correction.lines,
     });
     const earlier = await readContent(tx, billId);
-    if (paper) {
-      const { type, paperKind, number, date, vehicleId, notes } = paper;
+    if (entry) {
+      const { type, partyId, date, notes, columns, numbering } = entry;
       await tx.bill.update({
         where: { id: billId },
         data: {
-          paperKind,
-          number,
+          ...columns,
+          // A number the app issued stays, whatever else is corrected.
+          number: "typed" in numbering ? numbering.typed : undefined,
           date: toDatabaseDate(date),
           ...sides(type, partyId, shop.id),
-          vehicleId,
           notes,
         },
       });
@@ -216,7 +229,7 @@ export function correctBill(
       await keepVersion(tx, clock, staff, billId, earlier);
     }
   });
-  return paper ? refusingTakenNumber(save, paper.takenNumber) : save;
+  return entry ? refusingTakenNumber(save, entry.numbering) : save;
 }
 
 /**
@@ -435,25 +448,56 @@ async function keepVersion(
   });
 }
 
-/** What follows from the type of a bill copied from paper, on entry and on correction. */
-function paperDetails(bill: NewBill) {
+/**
+ * How a bill is numbered: by the number typed from paper, with what to say if
+ * another bill turns out to have it, or by the app, in a series with this prefix.
+ */
+type Numbering = { typed: string; taken: string } | { prefix: string };
+
+/**
+ * What follows from the type of a bill entered on the new bill form, on entry and
+ * on correction. The party is the one it names beside the shop, if any, and the
+ * columns are those that only some types fill.
+ */
+function entryDetails(bill: NewBill) {
+  const named = NAMED_PARTY[bill.type];
+  // What a bill has none of unless it is copied from paper, or writes cylinders off.
+  const none = { paperKind: null, vehicleId: null, writeOffReason: null };
+  if (bill.type === "add_cylinders") {
+    const numbering: Numbering = { prefix: "ADD" };
+    return { named, partyId: bill.supplierId, columns: none, numbering };
+  }
+  if (bill.type === "write_off") {
+    const numbering: Numbering = { prefix: "WOF" };
+    const columns = { ...none, writeOffReason: bill.writeOffReason };
+    return { named, partyId: bill.refillerId, columns, numbering };
+  }
   // A return from a refiller is numbered by the refiller's slip, not the agency's paper.
   const paperKind = bill.type === "return_from_refiller" ? null : bill.paperKind;
-  return {
-    partyId: bill.type === "dispatch" ? bill.customerId : bill.refillerId,
-    named: NAMED_PARTY[bill.type],
-    paperKind,
-    /** What to say if another bill turns out to have the number. */
-    takenNumber: paperKind
+  const numbering: Numbering = {
+    typed: bill.number,
+    taken: paperKind
       ? `${PAPER_KIND_NAMES[paperKind]} number ${bill.number} is already in use.`
       : `This refiller's slip number ${bill.number} is already in use.`,
   };
+  const partyId = bill.type === "dispatch" ? bill.customerId : bill.refillerId;
+  const columns = { ...none, paperKind, vehicleId: bill.vehicleId };
+  return { named, partyId, columns, numbering };
 }
 
-/** Which of the shop and the party the cylinders leave, and which receives them. */
-function sides(type: NewBill["type"], partyId: string, shopId: string) {
+/**
+ * Which of the shop and the other party the cylinders leave, and which receives
+ * them. Nobody is on the side outside the business, unless a supplier is named.
+ */
+function sides(type: NewBill["type"], partyId: string | null, shopId: string) {
+  // Written off from the party named, or from the shop when none is.
+  if (type === "write_off") {
+    return { fromPartyId: partyId ?? shopId, toPartyId: null };
+  }
   const [fromPartyId, toPartyId] =
-    type === "return_from_refiller" ? [partyId, shopId] : [shopId, partyId];
+    type === "return_from_refiller" || type === "add_cylinders"
+      ? [partyId, shopId]
+      : [shopId, partyId];
   return { fromPartyId, toPartyId };
 }
 
@@ -813,14 +857,14 @@ function returnLines(
 /**
  * The database keeps apart the numbers on each paper kind, and each refiller's
  * slip numbers, even between saves at once. Saving a bill copied from paper, new
- * or corrected, can repeat nothing else.
+ * or corrected, can repeat nothing else. Numbers the app issues are never taken.
  */
-async function refusingTakenNumber<T>(save: Promise<T>, refusal: string): Promise<T> {
+async function refusingTakenNumber<T>(save: Promise<T>, numbering: Numbering): Promise<T> {
   try {
     return await save;
   } catch (error) {
-    if (isRepeat(error)) {
-      throw new Refusal(409, refusal);
+    if ("taken" in numbering && isRepeat(error)) {
+      throw new Refusal(409, numbering.taken);
     }
     throw error;
   }

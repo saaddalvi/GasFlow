@@ -22,7 +22,10 @@ import {
 import { cancelBill, correctBill, enterBill } from "../services/ledger";
 import { idParam } from "./id-param";
 
-/** Every staff member reads bills and enters those copied from paper. */
+/**
+ * Every staff member reads bills and enters those copied from paper. Which types
+ * only admins enter is the ledger's to say.
+ */
 export function billRoutes(app: FastifyInstance, { db, clock }: AppDependencies): void {
   app.get("/api/bills", async (request) => {
     const query = parseRequest(billListQuerySchema, request.query);

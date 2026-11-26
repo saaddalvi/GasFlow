@@ -174,7 +174,8 @@ function Row({ bill }: { bill: BillList["bills"][number] }) {
       <td className="hidden px-3 py-3 md:table-cell">{describeBillType(bill)}</td>
       <td className="px-3 py-3 wrap-anywhere">
         {from && <span className="block text-slate-500">{from.name} →</span>}
-        {to?.name}
+        {/* Only a write-off has nobody receiving. */}
+        {to ? to.name : "Written off"}
         <span className="mt-1 block text-slate-500 lg:hidden">{quantities}</span>
       </td>
       <td className="hidden px-3 py-3 lg:table-cell">{quantities}</td>

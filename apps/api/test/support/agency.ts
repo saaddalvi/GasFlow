@@ -110,6 +110,30 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
   const postBill = (payload: object, { headers }: { headers: Record<string, string> } = staff) =>
     app.inject({ method: "POST", url: "/api/bills", headers, payload });
 
+  /**
+   * What the new bill form sends for cylinders added with no supplier named. A
+   * test changes whatever matters to it.
+   */
+  const addCylindersFor = (change: object = {}) => ({
+    type: "add_cylinders",
+    date: "2026-11-26",
+    lines: asLines([{ gas: "Medical oxygen", fillState: "empty", quantity: 5 }]),
+    ...change,
+  });
+
+  /**
+   * What the new bill form sends for cylinders written off from the shop. A test
+   * changes whatever matters to it.
+   */
+  const writeOffFor = (change: object = {}) => ({
+    type: "write_off",
+    refillerId: null,
+    writeOffReason: "scrapped",
+    date: "2026-11-26",
+    lines: asLines([{ gas: "Medical oxygen", fillState: "defective", quantity: 2 }]),
+    ...change,
+  });
+
   let billsNumbered = 0;
 
   /**
@@ -251,20 +275,33 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     if (bill.type === "opening_stock") {
       return { type: bill.type, lines, ...change };
     }
-    const { type, paperKind, number, date, from, to, vehicle, notes } = bill;
+    const { type, paperKind, number, date, vehicle, writeOffReason, notes } = bill;
     return {
       type,
       paperKind,
       number,
       date,
-      ...(type === "dispatch"
-        ? { customerId: to?.id }
-        : { refillerId: (type === "send_to_refiller" ? to : from)?.id }),
+      ...namedOn(bill),
       vehicleId: vehicle?.id ?? null,
+      writeOffReason,
       notes,
       lines,
       ...change,
     };
+  }
+
+  /** Whom a bill names beside the shop, as the form for its type sends it. */
+  function namedOn({ type, from, to }: Bill) {
+    switch (type) {
+      case "dispatch":
+        return { customerId: to?.id };
+      case "add_cylinders":
+        return { supplierId: from?.id ?? null };
+      case "write_off":
+        return { refillerId: from?.type === "refiller" ? from.id : null };
+      default:
+        return { refillerId: (type === "send_to_refiller" ? to : from)?.id };
+    }
   }
 
   /** Corrects a bill as the admin, who may correct any, expecting that to be saved. */
@@ -386,6 +423,8 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     postOpeningStock,
     enter,
     postBill,
+    addCylindersFor,
+    writeOffFor,
     dispatchFor,
     dispatch,
     sendFor,

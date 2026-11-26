@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeading } from "@/components/page-heading";
-import { fetchGases, fetchStartDate, fetchToday, fetchVehicles, orNull } from "@/lib/api";
+import { fetchGases, fetchMe, fetchStartDate, fetchToday, fetchVehicles, orNull } from "@/lib/api";
 import { OPENING_STOCK_PATH } from "@/lib/routes";
 import { BillForm, type FormChoices } from "./bill-form";
 
@@ -13,22 +13,33 @@ export const metadata: Metadata = {
 
 export default async function NewBillPage() {
   await auth.protect();
-  const [setup, today, gases, vehicles] = await Promise.all([
+  const [me, setup, today, gases, vehicles] = await Promise.all([
+    orNull(fetchMe()),
     orNull(fetchStartDate()),
     orNull(fetchToday()),
     orNull(fetchGases()),
     orNull(fetchVehicles()),
   ]);
   const choices: FormChoices | null =
-    setup?.startDate && today && gases && vehicles
-      ? { startDate: setup.startDate, today, gases: gases.gases, vehicles: vehicles.vehicles }
+    me && setup?.startDate && today && gases && vehicles
+      ? {
+          isAdmin: me.isAdmin,
+          startDate: setup.startDate,
+          today,
+          gases: gases.gases,
+          vehicles: vehicles.vehicles,
+        }
       : null;
 
   return (
     <div className="space-y-6">
       <PageHeading
         title="New bill"
-        subtitle="Cylinders going out from the shop or coming back from a refiller, copied from the paper."
+        subtitle={
+          me?.isAdmin
+            ? "Cylinders moving to or from the shop, or joining or leaving the business."
+            : "Cylinders going out from the shop or coming back from a refiller, copied from the paper."
+        }
       />
       {setup && !setup.startDate ? (
         <EmptyState>

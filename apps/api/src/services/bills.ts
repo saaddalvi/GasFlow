@@ -222,6 +222,7 @@ const CONTENT = {
   toParty: { select: PARTY },
   vehicle: { select: { id: true, plate: true, label: true } },
   notes: true,
+  writeOffReason: true,
   lines: {
     select: {
       id: true,
@@ -243,5 +244,6 @@ const SUMMARY = {
   status: true,
   fromParty: CONTENT.fromParty,
   toParty: CONTENT.toParty,
+  writeOffReason: true,
   lines: CONTENT.lines,
 } as const;

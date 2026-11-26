@@ -4,7 +4,7 @@ export const SIGN_IN_PATH = "/sign-in";
 /** Every bill, a page at a time. */
 export const BILLS_PATH = "/bills";
 
-/** Where a bill copied from the agency's paper is entered. */
+/** Where a bill is entered: one copied from paper or, by an admin, one that is not. */
 export const NEW_BILL_PATH = "/bills/new";
 
 /** The page of one bill. */

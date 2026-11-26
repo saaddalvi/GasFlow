@@ -91,7 +91,11 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       <Lines lines={bill.lines} />
       {bill.returns && <Returns returns={bill.returns} />}
       {bill.lastCorrection && (
-        <Versions earlier={bill.earlierVersions} lastCorrection={bill.lastCorrection} />
+        <Versions
+          type={bill.type}
+          earlier={bill.earlierVersions}
+          lastCorrection={bill.lastCorrection}
+        />
       )}
       {/* Always here, so that a refusal stays up when it is no longer offered. Keyed,
           so that nothing typed on one bill is left on the next. */}

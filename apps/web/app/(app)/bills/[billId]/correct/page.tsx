@@ -45,6 +45,7 @@ export default async function CorrectBillPage({ params }: { params: Promise<{ bi
       ? {
           bill,
           choices: {
+            isAdmin: me.isAdmin,
             startDate: setup.startDate,
             today,
             // What the bill already names stays on offer, though no longer in use.

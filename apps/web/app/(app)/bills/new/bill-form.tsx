@@ -4,11 +4,14 @@ import {
   checkInput,
   FILL_STATES,
   newBillSchema,
+  WRITE_OFF_REASONS,
+  whyNotEnter,
   type Bill,
   type FillState,
   type Gas,
   type NewBill,
   type PaperKind,
+  type PartyType,
   type Vehicle,
 } from "@gasflow/shared";
 import { useRouter } from "next/navigation";
@@ -28,7 +31,7 @@ import {
 } from "@/components/line-fields";
 import { LoadError } from "@/components/load-error";
 import type { Outcome } from "@/lib/api";
-import { BILL_TYPE_NAMES, FILL_STATE_NAMES } from "@/lib/bill-names";
+import { BILL_TYPE_NAMES, FILL_STATE_NAMES, WRITE_OFF_REASON_NAMES } from "@/lib/bill-names";
 import { holdEnter } from "@/lib/hold-enter";
 import { billPath, BILLS_PATH } from "@/lib/routes";
 import { useLastGiven } from "@/lib/use-last-given";
@@ -37,10 +40,12 @@ import { correctBill } from "../actions";
 import { saveBill } from "./actions";
 import { BillNumberFields, RefillerSlipNumberField } from "./bill-number-fields";
 import { NewPartyDialog } from "./new-party-dialog";
-import { PartyPicker, type ChosenParty, type PickableType } from "./party-picker";
+import { PartyPicker, type ChosenParty } from "./party-picker";
 
 /** What the form offers, and the dates it starts from. */
 export interface FormChoices {
+  /** Whether to offer the types of bill that only admins enter. */
+  isAdmin: boolean;
   startDate: string;
   today: string;
   gases: Gas[];
@@ -48,14 +53,36 @@ export interface FormChoices {
 }
 
 /** A bill of a type this form offers, to be corrected on it. */
-export type PaperBill = Bill & { type: NewBill["type"] };
+export type FormBill = Bill & { type: NewBill["type"] };
 
 /** How the form differs from one type of bill to another. */
-const BILL_FORMS: Record<NewBill["type"], { partyType: PickableType; fillState: FillState }> = {
-  dispatch: { partyType: "customer", fillState: "filled" },
-  send_to_refiller: { partyType: "refiller", fillState: "empty" },
-  return_from_refiller: { partyType: "refiller", fillState: "filled" },
+const BILL_FORMS: Record<
+  NewBill["type"],
+  {
+    /** The type of party it names beside the shop. */
+    partyType: PartyType;
+    /** Whether it may leave that party out. */
+    partyOptional?: boolean;
+    /** What each line shows until a fill state is chosen for it. */
+    fillState: FillState;
+    /** Whether it is copied from paper, which gives its number and may name a vehicle. */
+    fromPaper: boolean;
+  }
+> = {
+  dispatch: { partyType: "customer", fillState: "filled", fromPaper: true },
+  send_to_refiller: { partyType: "refiller", fillState: "empty", fromPaper: true },
+  return_from_refiller: { partyType: "refiller", fillState: "filled", fromPaper: true },
+  add_cylinders: {
+    partyType: "supplier",
+    partyOptional: true,
+    fillState: "empty",
+    fromPaper: false,
+  },
+  write_off: { partyType: "refiller", fillState: "defective", fromPaper: false },
 };
+
+/** Where a write-off can be from, as far as this form goes. */
+type WrittenOffFrom = "shop" | "refiller";
 
 export function BillForm({
   choices,
@@ -63,7 +90,7 @@ export function BillForm({
 }: {
   choices: FormChoices | null;
   /** The bill being corrected. Left out for a new one. */
-  bill?: PaperBill;
+  bill?: FormBill;
 }) {
   const shown = useLastGiven(choices);
 
@@ -77,11 +104,11 @@ export function BillForm({
 }
 
 function Form({
-  choices: { startDate, today, gases, vehicles },
+  choices: { isAdmin, startDate, today, gases, vehicles },
   bill,
 }: {
   choices: FormChoices;
-  bill?: PaperBill;
+  bill?: FormBill;
 }) {
   const router = useRouter();
   const [type, setType] = useState<NewBill["type"]>(bill?.type ?? "dispatch");
@@ -93,28 +120,34 @@ function Form({
   );
   const [date, setDate] = useState(bill?.date ?? today);
   // One of each type is remembered, in case the type is changed and changed back.
-  const [chosen, setChosen] = useState<Partial<Record<PickableType, ChosenParty | null>>>(() =>
+  const [chosen, setChosen] = useState<Partial<Record<PartyType, ChosenParty | null>>>(() =>
     bill ? { [BILL_FORMS[bill.type].partyType]: namedOn(bill) } : {},
+  );
+  const [writtenOffFrom, setWrittenOffFrom] = useState<WrittenOffFrom>(
+    bill?.from?.type === "refiller" ? "refiller" : "shop",
   );
   const [newName, setNewName] = useState("");
   const [lines, setLines] = useState(() => (bill ? asFormLines(bill.lines) : [blankLine(1)]));
   // How many saves have been turned down, each of which may mean the number is taken.
   const [refusals, setRefusals] = useState(0);
   const newParty = useRef<ActionDialogHandle>(null);
-  const { partyType, fillState: defaultFillState } = BILL_FORMS[type];
+  const { partyType, partyOptional, fillState: defaultFillState, fromPaper } = BILL_FORMS[type];
   const party = chosen[partyType] ?? null;
+  // A write-off from the shop names nobody else.
+  const namesParty = type !== "write_off" || writtenOffFrom === "refiller";
   const choose = (party: ChosenParty | null) =>
     setChosen((chosen) => ({ ...chosen, [partyType]: party }));
 
   async function submit(form: FormData): Promise<Outcome> {
+    // The check leaves out whatever is no part of a bill of this type.
     const { data, problem } = checkInput(newBillSchema, {
       type,
-      // Not part of a return from refiller, which the check leaves out.
       paperKind,
       number: type === "return_from_refiller" ? refillerSlipNumber : paperNumber,
       date,
-      [`${partyType}Id`]: party?.id ?? "",
+      [`${partyType}Id`]: namesParty ? (party?.id ?? (partyOptional ? null : "")) : null,
       vehicleId: form.get("vehicleId") || null,
+      writeOffReason: form.get("writeOffReason"),
       notes: form.get("notes"),
       lines: asNewLines(lines, defaultFillState),
     });
@@ -156,11 +189,13 @@ function Form({
                 value={type}
                 onChange={(event) => setType(event.target.value as NewBill["type"])}
               >
-                {Object.keys(BILL_FORMS).map((option) => (
-                  <option key={option} value={option}>
-                    {BILL_TYPE_NAMES[option as NewBill["type"]]}
-                  </option>
-                ))}
+                {(Object.keys(BILL_FORMS) as NewBill["type"][])
+                  .filter((option) => !whyNotEnter(option, { isAdmin }))
+                  .map((option) => (
+                    <option key={option} value={option}>
+                      {BILL_TYPE_NAMES[option]}
+                    </option>
+                  ))}
               </SelectField>
             )}
             {type === "return_from_refiller" ? (
@@ -172,34 +207,67 @@ function Form({
                 ownBillId={bill?.id}
               />
             ) : (
-              <BillNumberFields
-                paperKind={paperKind}
-                number={paperNumber}
-                onPaperKind={setPaperKind}
-                onNumber={setPaperNumber}
-                askAgain={refusals}
-                ownBillId={bill?.id}
-              />
+              fromPaper && (
+                <BillNumberFields
+                  paperKind={paperKind}
+                  number={paperNumber}
+                  onPaperKind={setPaperKind}
+                  onNumber={setPaperNumber}
+                  askAgain={refusals}
+                  ownBillId={bill?.id}
+                />
+              )
             )}
             <BillDateField startDate={startDate} value={date} onChange={setDate} />
-            <PartyPicker
-              key={partyType}
-              type={partyType}
-              chosen={party}
-              onChoose={choose}
-              onNew={(typed) => {
-                setNewName(typed);
-                newParty.current?.open();
-              }}
-            />
-            <SelectField label="Vehicle" name="vehicleId" defaultValue={bill?.vehicle?.id ?? ""}>
-              <option value="">No vehicle</option>
-              {vehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicleName(vehicle)}
-                </option>
-              ))}
-            </SelectField>
+            {type === "write_off" && (
+              <SelectField
+                label="Written off from"
+                required
+                value={writtenOffFrom}
+                onChange={(event) => setWrittenOffFrom(event.target.value as WrittenOffFrom)}
+              >
+                <option value="shop">The shop</option>
+                <option value="refiller">A refiller</option>
+              </SelectField>
+            )}
+            {namesParty && (
+              <PartyPicker
+                key={partyType}
+                type={partyType}
+                chosen={party}
+                onChoose={choose}
+                onNew={(typed) => {
+                  setNewName(typed);
+                  newParty.current?.open();
+                }}
+                optional={partyOptional}
+              />
+            )}
+            {type === "write_off" && (
+              <SelectField
+                label="Reason"
+                name="writeOffReason"
+                required
+                defaultValue={bill?.writeOffReason ?? ""}
+              >
+                <option value="">Choose a reason</option>
+                {WRITE_OFF_REASONS.map((reason) => (
+                  <option key={reason} value={reason}>
+                    {WRITE_OFF_REASON_NAMES[reason]}
+                  </option>
+                ))}
+              </SelectField>
+            )}
+            {fromPaper && (
+              <SelectField label="Vehicle" name="vehicleId" defaultValue={bill?.vehicle?.id ?? ""}>
+                <option value="">No vehicle</option>
+                {vehicles.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicleName(vehicle)}
+                  </option>
+                ))}
+              </SelectField>
+            )}
             <div className="sm:col-span-2">
               <TextAreaField label="Notes" name="notes" defaultValue={bill?.notes ?? ""} />
             </div>
@@ -208,7 +276,8 @@ function Form({
             <legend className="float-left w-full font-semibold">Lines</legend>
             {lines.some((line) => line.optional) && (
               <p className="clear-left text-sm text-slate-500">
-                Leave the quantity blank for a gas that is not on the paper.
+                Leave the quantity blank for a gas that is not on the {fromPaper ? "paper" : "bill"}
+                .
               </p>
             )}
             <LineList
@@ -231,12 +300,14 @@ function Form({
   );
 }
 
-/** The customer or refiller a bill names. */
-function namedOn({ type, from, to }: PaperBill): ChosenParty | null {
-  return type === "return_from_refiller" ? from : to;
+/** The party a bill names beside the shop, if any. */
+function namedOn({ type, from, to }: FormBill): ChosenParty | null {
+  const named = type === "dispatch" || type === "send_to_refiller" ? to : from;
+  // A write-off may be from the shop.
+  return named && named.type !== "shop" ? named : null;
 }
 
-/** The cylinders on the lines so far, to check against the paper. */
+/** The cylinders on the lines so far, to check against the paper or a count. */
 function Totals({ lines, defaultFillState }: { lines: FormLine[]; defaultFillState: FillState }) {
   // A quantity counts once it is one the bill could be saved with.
   const counted = lines.map((line) => {

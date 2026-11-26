@@ -148,10 +148,13 @@ In the API:
 - Bills are never deleted, and a cancelled one is never posted again. Everything
   that counts cylinders reads posted bills only. A correction changes the bill in
   place and keeps what it said before in `bill_revisions`, which nothing counts.
-- Who may cancel or correct a bill is decided by `whyNotCancel` and
-  `whyNotCorrect` in `packages/shared`, and whether anyone can correct it by
-  `whyUncorrectable`. The screens ask these too, so that they offer nothing the
-  API would refuse.
+- Who may enter a type of bill on the new bill form is decided by `whyNotEnter`
+  in `packages/shared`, who may cancel or correct a bill by `whyNotCancel` and
+  `whyNotCorrect`, and whether anyone can correct it by `whyUncorrectable`. The
+  screens ask these too, so that they offer nothing the API would refuse.
+- Cylinders added to the business come from a supplier or from nobody, and
+  those written off go to nobody. Reports count only what the shop, customers
+  and refillers gain and lose, so neither side outside the business ever shows.
 - Reports only read. They work every figure out from posted bills, and no stock
   count is stored. Pending cylinders are likewise worked out, by
   `src/services/pending.ts`, from the allocations of posted returns. Unmatched

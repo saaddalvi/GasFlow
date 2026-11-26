@@ -7,9 +7,12 @@ import { DetailList, Lines, movementDetails } from "./bill-parts";
  * first. Each earlier version opens to show what it said.
  */
 export function Versions({
+  type,
   earlier,
   lastCorrection: { correctedBy, correctedAt },
 }: {
+  /** The bill's type, which no correction changes. */
+  type: Bill["type"];
   /** The oldest first. */
   earlier: BillVersion[];
   lastCorrection: NonNullable<Bill["lastCorrection"]>;
@@ -29,7 +32,7 @@ export function Versions({
         {earlier
           .map((version, index) => (
             <li key={index}>
-              <Version version={version} number={index + 1} />
+              <Version type={type} version={version} number={index + 1} />
             </li>
           ))
           .reverse()}
@@ -40,9 +43,11 @@ export function Versions({
 
 /** One earlier version, shut until asked for. */
 function Version({
+  type,
   version: { savedBy, savedAt, ...content },
   number,
 }: {
+  type: Bill["type"];
   version: BillVersion;
   /** The version's place among them, counted from 1, the bill as first entered. */
   number: number;
@@ -65,7 +70,7 @@ function Version({
             ["Number", content.number],
             ["Date", formatDate(date)],
             ["Paper kind", paperKind && PAPER_KIND_NAMES[paperKind]],
-            ...movementDetails(content),
+            ...movementDetails({ type, ...content }),
           ]}
         />
         <Lines lines={lines} />

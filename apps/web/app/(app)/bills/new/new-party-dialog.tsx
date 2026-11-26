@@ -1,11 +1,10 @@
 "use client";
 
-import { checkInput, newPartySchema, type Party } from "@gasflow/shared";
+import { checkInput, newPartySchema, type Party, type PartyType } from "@gasflow/shared";
 import { ActionDialog, type ActionDialogHandle } from "@/components/action-dialog";
 import { Field, TextAreaField } from "@/components/fields";
 import type { Outcome } from "@/lib/api";
 import { addParty } from "./actions";
-import type { PickableType } from "./party-picker";
 
 /** Adds a party from a bill, leaving what has been entered on the bill as it is. */
 export function NewPartyDialog({
@@ -15,7 +14,7 @@ export function NewPartyDialog({
   onAdded,
 }: {
   ref: React.Ref<ActionDialogHandle>;
-  type: PickableType;
+  type: PartyType;
   /** What was typed in the picker, to begin the name with. */
   name: string;
   onAdded: (party: Party) => void;

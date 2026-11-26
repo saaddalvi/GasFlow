@@ -19,6 +19,8 @@ export const billTypeSchema = z.enum([
   "send_to_refiller",
   "return_from_refiller",
   "return_from_customer",
+  "add_cylinders",
+  "write_off",
 ]);
 
 export type BillType = z.infer<typeof billTypeSchema>;
@@ -61,6 +63,12 @@ export function billName({
 }): string {
   return paperKind ? `${PAPER_KIND_NAMES[paperKind]} ${number}` : number;
 }
+
+export const WRITE_OFF_REASONS = ["scrapped", "lost"] as const;
+
+export const writeOffReasonSchema = z.enum(WRITE_OFF_REASONS, "Choose scrapped or lost.");
+
+export type WriteOffReason = z.infer<typeof writeOffReasonSchema>;
 
 /** A party as a bill names it, which may be the shop. */
 export const billPartySchema = z.object({
@@ -172,6 +180,8 @@ export const billContentSchema = z.object({
   /** Which vehicle carried the cylinders, if the bill says. */
   vehicle: vehicleSchema.pick({ id: true, plate: true, label: true }).nullable(),
   notes: z.string().nullable(),
+  /** Set on write-offs, and only on those. Versions kept before there were any lack it. */
+  writeOffReason: writeOffReasonSchema.nullable().default(null),
   lines: z.array(billLineSchema),
 });
 
@@ -231,6 +241,7 @@ export const billListSchema = z.object({
       status: true,
       from: true,
       to: true,
+      writeOffReason: true,
       lines: true,
     }),
   ),
@@ -253,6 +264,15 @@ export const quantitySchema = z
   .int(WHOLE_NUMBER)
   .min(1, "Enter a quantity of 1 or more on each line.")
   .max(MOST_ON_A_LINE, "Enter at most 100000 on a line.");
+
+/**
+ * Why this person is not allowed to enter a bill of this type on the new bill
+ * form, or null if they are. The API and the form both ask.
+ */
+export function whyNotEnter(type: NewBill["type"], staff: Pick<Staff, "isAdmin">): string | null {
+  const adminsOnly = ADMIN_BILLS[type];
+  return adminsOnly && !staff.isAdmin ? `Only an admin can ${adminsOnly.enter}.` : null;
+}
 
 /**
  * Why this person is not allowed to cancel the bill, or null if they are. Admins
@@ -294,6 +314,16 @@ export function whyUncorrectable({
   return null;
 }
 
+/**
+ * The types of bill that only an admin may enter, correct or cancel, with how the
+ * refusals name one and what they call entering it.
+ */
+const ADMIN_BILLS: Partial<Record<BillType, { one: string; enter: string }>> = {
+  opening_stock: { one: "opening stock", enter: "enter opening stock" },
+  add_cylinders: { one: "an add cylinders bill", enter: "add cylinders" },
+  write_off: { one: "a write-off", enter: "write off cylinders" },
+};
+
 /** Who entered a bill and when, which with its type decides who may change it. */
 interface Entered {
   type: BillType;
@@ -312,8 +342,9 @@ function whyNotChange(
   if (staff.isAdmin) {
     return null;
   }
-  if (type === "opening_stock") {
-    return `Only an admin can ${change} opening stock.`;
+  const adminsOnly = ADMIN_BILLS[type];
+  if (adminsOnly) {
+    return `Only an admin can ${change} ${adminsOnly.one}.`;
   }
   if (enteredBy.id !== staff.id || indianDate(new Date(enteredAt)) !== today) {
     return `You can ${change} only bills you entered today. Ask an admin to ${change} this one.`;
@@ -350,14 +381,19 @@ const CHOOSE_TYPE = "Choose the type of bill.";
 
 const refillerIdSchema = z.uuid("Choose a refiller.").toLowerCase();
 
-/** What every bill entered from paper says, besides its number and its party. */
-const paperFields = {
+/** What every bill entered on the new bill form says, whatever its type. */
+const formFields = {
   date: z.iso.date("Choose the bill date."),
-  vehicleId: z.uuid("Choose a vehicle from the list.").toLowerCase().nullable().default(null),
   notes: optionalText({ max: 1000, tooLong: "Use notes of at most 1000 characters." }).default(
     null,
   ),
   lines: newBillLinesSchema,
+};
+
+/** What every bill entered from paper says, besides its number and its party. */
+const paperFields = {
+  ...formFields,
+  vehicleId: z.uuid("Choose a vehicle from the list.").toLowerCase().nullable().default(null),
 };
 
 /**
@@ -405,10 +441,44 @@ export const newReturnFromRefillerSchema = z.object({
 
 export type NewReturnFromRefiller = z.infer<typeof newReturnFromRefillerSchema>;
 
+/**
+ * Cylinders joining the business at the shop, as they are entered. The app gives
+ * the bill its number.
+ */
+export const newAddCylindersSchema = z.object({
+  type: z.literal("add_cylinders", CHOOSE_TYPE),
+  /** Left out when the bill names no supplier. */
+  supplierId: z.uuid("Choose a supplier from the list.").toLowerCase().nullable().default(null),
+  ...formFields,
+});
+
+export type NewAddCylinders = z.infer<typeof newAddCylindersSchema>;
+
+/**
+ * Cylinders scrapped or lost at the shop or a refiller, as they are entered. A
+ * customer's are written off against a bill, and so are not entered like this. The
+ * app gives the bill its number.
+ */
+export const newWriteOffSchema = z.object({
+  type: z.literal("write_off", CHOOSE_TYPE),
+  /** The refiller who had them, or null for the shop. */
+  refillerId: refillerIdSchema.nullable(),
+  writeOffReason: writeOffReasonSchema,
+  ...formFields,
+});
+
+export type NewWriteOff = z.infer<typeof newWriteOffSchema>;
+
 /** A bill of any type the new bill form offers. */
 export const newBillSchema = z.discriminatedUnion(
   "type",
-  [newDispatchSchema, newSendToRefillerSchema, newReturnFromRefillerSchema],
+  [
+    newDispatchSchema,
+    newSendToRefillerSchema,
+    newReturnFromRefillerSchema,
+    newAddCylindersSchema,
+    newWriteOffSchema,
+  ],
   CHOOSE_TYPE,
 );
 
@@ -426,12 +496,7 @@ export const openingStockCorrectionSchema = z.object({
  */
 export const billCorrectionSchema = z.discriminatedUnion(
   "type",
-  [
-    newDispatchSchema,
-    newSendToRefillerSchema,
-    newReturnFromRefillerSchema,
-    openingStockCorrectionSchema,
-  ],
+  [...newBillSchema.options, openingStockCorrectionSchema],
   CHOOSE_TYPE,
 );
 
