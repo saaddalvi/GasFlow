@@ -58,7 +58,8 @@ function Version({
           {formatMoment(savedAt)}
         </span>
       </summary>
-      <div className="space-y-3 border-t border-slate-100 bg-slate-50 p-3">
+      {/* Rounded below, so that its background does not square off the box's corners. */}
+      <div className="space-y-3 rounded-b-xl border-t border-slate-100 bg-slate-50 p-3">
         <DetailList
           details={[
             ["Number", content.number],
