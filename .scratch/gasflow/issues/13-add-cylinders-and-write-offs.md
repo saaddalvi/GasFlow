@@ -54,3 +54,20 @@ For later tickets:
 
 - Ticket 14: `newWriteOffSchema` and the form's **Written off from** know only the shop and refillers, and the API refuses a customer with "A write-off is from the shop or a refiller." The database already allows a write-off from a customer. `whyUncorrectable` sees only the type and status, so it will need to know whom a write-off is from; until it refuses a customer's, the correction form would treat one as the shop's.
 - Tickets 18, 20 and 21: one side of these bills is null or a supplier. Count only what the shop, customers and refillers gain and lose.
+
+**27 November 2026: checks run in Chrome. All passed. A real phone is still to do.**
+
+Run in headless Chrome through the Playwright MCP against commit `515afcd` (the code at `90dbfa2`), signed in with real Clerk development accounts (`admin` and `test1`). The app and the database were copies, and the figures were made up. The start date, a refiller, a supplier and opening stock were created through the API; everything below was done on screen unless it says otherwise.
+
+- **Adding cylinders: passed**, with a supplier chosen from the list, with none, and with one added from within the bill. A name typed but not chosen held the form back.
+- **Writing off: passed** from the shop and from a refiller. Saving without a reason, or without the refiller, was refused.
+- **Correcting: passed.** An add cylinders bill and a shop write-off each started their form with what they said, showed **Edited** and kept the earlier version. A write-off was also moved from a refiller to the shop.
+- **Cancelling: passed** for one of each. Each was confirmed first, showed who, when and why, and then offered neither correcting nor cancelling.
+- **Stock report: passed.** After each of the eight entries, corrections and cancellations the figures were as worked out by hand beforehand, and again after the three bills on the emulated phone taken together. No supplier appeared and no count went below zero.
+- **Staff: passed.** **New bill** offered neither type. Neither bill offered **Correct bill** or **Cancel bill**, and each correction page said why. The API refused entering, correcting and cancelling both types, asked directly, and nothing changed.
+- **Widths: passed.** No sideways scrolling at 320, 390, 768 and 1280 on the new bill form (both types, and with the supplier or refiller list open), the bill list, the corrected and cancelled bills of both types with their versions open, both correction pages and the Stock report.
+- **On a phone: passed on an emulated phone** (touch, 390 wide). A write-off from a refiller was entered and corrected, and cylinders were added from a new supplier.
+
+No page errors were raised, and the API answered no request with a server error. The one console error was a missing `favicon.ico`.
+
+Still to do: enter a write-off on a real phone. Safari and Firefox have not been tried.
