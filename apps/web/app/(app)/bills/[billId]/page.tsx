@@ -13,6 +13,7 @@ import { formatDate, formatMoment } from "@/lib/dates";
 import { BILL_PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { BILLS_PATH, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
 import { vehicleName } from "@/lib/vehicle-names";
+import { Returns } from "./returns";
 
 export const metadata: Metadata = {
   title: "Bill · GasFlow",
@@ -60,17 +61,19 @@ export default async function BillPage({ params }: { params: Promise<{ billId: s
       </PageHeading>
       <Details bill={bill} />
       <Lines lines={bill.lines} />
+      {bill.returns && <Returns returns={bill.returns} />}
     </div>
   );
 }
 
 function Details({
-  bill: { paperKind, from, to, vehicle, notes, enteredBy, enteredAt },
+  bill: { paperKind, slipNumber, from, to, vehicle, notes, enteredBy, enteredAt },
 }: {
   bill: Bill;
 }) {
   const details = [
     ["Paper kind", paperKind && PAPER_KIND_NAMES[paperKind]],
+    ["Slip number", slipNumber],
     ["From", from && <PartyName party={from} />],
     // Opening stock names only the party that held it.
     [from ? "To" : "Party", to && <PartyName party={to} />],

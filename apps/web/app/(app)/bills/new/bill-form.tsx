@@ -14,14 +14,16 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import type { ActionDialogHandle } from "@/components/action-dialog";
 import { ActionForm } from "@/components/action-form";
+import { BillDateField } from "@/components/bill-date-field";
 import { buttonStyles } from "@/components/button-styles";
-import { Field, SelectField, TextAreaField } from "@/components/fields";
+import { SelectField, TextAreaField } from "@/components/fields";
 import { asNewLines, blankLine, LineList, nextKey, type FormLine } from "@/components/line-fields";
 import { LoadError } from "@/components/load-error";
 import type { Outcome } from "@/lib/api";
 import { BILL_TYPE_NAMES, FILL_STATE_NAMES } from "@/lib/bill-names";
-import { formatDate, formatDateInFull } from "@/lib/dates";
+import { holdEnter } from "@/lib/hold-enter";
 import { BILLS_PATH } from "@/lib/routes";
+import { useLastGiven } from "@/lib/use-last-given";
 import { vehicleName } from "@/lib/vehicle-names";
 import { saveBill } from "./actions";
 import { BillNumberFields, RefillerSlipNumberField } from "./bill-number-fields";
@@ -44,11 +46,7 @@ const BILL_FORMS: Record<NewBill["type"], { partyType: PickableType; fillState: 
 };
 
 export function BillForm({ choices }: { choices: FormChoices | null }) {
-  // The page loads again after a refusal. Should that fail, the form keeps what it
-  // had, so that a bill being entered is not lost.
-  const [held, setHeld] = useState(choices);
-  if (choices && choices !== held) setHeld(choices);
-  const shown = choices ?? held;
+  const shown = useLastGiven(choices);
 
   return shown ? (
     <Form choices={shown} />
@@ -107,14 +105,6 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
     if (added.length > 0) setLines([...kept, ...added]);
   }
 
-  // Only the "Save bill" button saves. Enter in a box, which is easily pressed
-  // halfway through a bill, does nothing.
-  function holdEnter(event: React.KeyboardEvent) {
-    if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
-      event.preventDefault();
-    }
-  }
-
   return (
     <div className="max-w-3xl">
       <section onKeyDown={holdEnter} className="rounded-xl border border-slate-200 bg-white p-5">
@@ -152,21 +142,7 @@ function Form({ choices: { startDate, today, gases, vehicles } }: { choices: For
                 askAgain={refusals}
               />
             )}
-            <div>
-              <Field
-                label="Date"
-                type="date"
-                required
-                min={startDate}
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-                hint={`Records begin on ${formatDate(startDate)}.`}
-              />
-              {/* To check against the paper. */}
-              <p aria-live="polite" className="mt-1 text-sm font-medium empty:hidden">
-                {date && formatDateInFull(date)}
-              </p>
-            </div>
+            <BillDateField startDate={startDate} value={date} onChange={setDate} />
             <PartyPicker
               key={partyType}
               type={partyType}

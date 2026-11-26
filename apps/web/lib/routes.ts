@@ -12,5 +12,8 @@ export function billPath(billId: string): string {
   return `${BILLS_PATH}/${billId}`;
 }
 
+/** Where cylinders coming back from a customer are recorded. */
+export const RECEIVE_EMPTIES_PATH = "/returns/new";
+
 /** Where opening stock is entered and listed. */
 export const OPENING_STOCK_PATH = "/bills/opening-stock/new";

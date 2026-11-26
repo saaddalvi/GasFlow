@@ -9,6 +9,7 @@ import { meRoutes } from "./routes/me";
 import { openingStockRoutes } from "./routes/opening-stock";
 import { partyRoutes } from "./routes/parties";
 import { reportRoutes } from "./routes/reports";
+import { returnRoutes } from "./routes/returns";
 import { setupRoutes } from "./routes/setup";
 import { shopRoutes } from "./routes/shop";
 import { staffRoutes } from "./routes/staff";
@@ -31,6 +32,7 @@ export function buildApp(dependencies: AppDependencies, options: FastifyServerOp
   openingStockRoutes(app, dependencies);
   partyRoutes(app, dependencies);
   reportRoutes(app, dependencies);
+  returnRoutes(app, dependencies);
   setupRoutes(app, dependencies);
   shopRoutes(app, dependencies);
   staffRoutes(app, dependencies);

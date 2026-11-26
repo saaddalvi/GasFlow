@@ -1,8 +1,12 @@
 import {
   billListSchema,
   billSchema,
+  closedRowListSchema,
   gasListSchema,
   partySchema,
+  pendingListSchema,
+  receivedReturnSchema,
+  returnCustomerListSchema,
   shopSchema,
   stockReportSchema,
   vehicleSchema,
@@ -171,6 +175,63 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
   const refillerReturn = (refillerId: string, change?: object) =>
     save(refillerReturnFor(refillerId, change));
 
+  /** One row of Receive empties as it is sent, against a gas on a bill. */
+  const against = (
+    bill: { id: string },
+    name: string,
+    quantity: number,
+    change: { fillState?: FillState } = {},
+  ) => ({ billId: bill.id, gasId: gas(name).id, quantity, ...change });
+
+  /** What Receive empties sends. A test changes whatever matters to it. */
+  const returnFor = (customerId: string, allocations: object[], change: object = {}) => ({
+    customerId,
+    date: "2026-11-26",
+    allocations,
+    ...change,
+  });
+
+  /** Asks to save a return, as the staff member unless told otherwise. */
+  const postReturn = (payload: object, { headers }: { headers: Record<string, string> } = staff) =>
+    app.inject({ method: "POST", url: "/api/returns", headers, payload });
+
+  /** Receives empties, expecting them to be saved. */
+  async function receive(customerId: string, allocations: object[], change?: object) {
+    const response = await postReturn(returnFor(customerId, allocations, change));
+    expect(response.statusCode).toBe(201);
+    return receivedReturnSchema.parse(response.json());
+  }
+
+  /** What Receive empties lists for the customer on a date. */
+  async function pending(customerId: string, date = "2026-11-26") {
+    const response = await get(`/api/returns/pending?customerId=${customerId}&date=${date}`);
+    expect(response.statusCode).toBe(200);
+    return pendingListSchema.parse(response.json()).rows;
+  }
+
+  /** One page of the rows with nothing pending, for a query such as "page=2". */
+  async function closed(customerId: string, query = "", date = "2026-11-26") {
+    const response = await get(
+      `/api/returns/closed?customerId=${customerId}&date=${date}&${query}`,
+    );
+    expect(response.statusCode).toBe(200);
+    return closedRowListSchema.parse(response.json());
+  }
+
+  /** What the Receive empties picker lists for a query such as "search=city". */
+  async function returnCustomers(query = "") {
+    const response = await get(`/api/returns/customers?${query}`);
+    expect(response.statusCode).toBe(200);
+    return returnCustomerListSchema.parse(response.json());
+  }
+
+  /** The bill as its page shows it. */
+  async function viewBill(billId: string) {
+    const response = await get(`/api/bills/${billId}`);
+    expect(response.statusCode).toBe(200);
+    return billSchema.parse(response.json());
+  }
+
   /** The stock report staff see for a query such as "date=2026-11-01". */
   async function report(query = "") {
     const response = await get(`/api/reports/stock?${query}`);
@@ -215,6 +276,14 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     send,
     refillerReturnFor,
     refillerReturn,
+    against,
+    returnFor,
+    postReturn,
+    receive,
+    pending,
+    closed,
+    returnCustomers,
+    viewBill,
     report,
     figures,
     bills,

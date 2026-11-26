@@ -25,3 +25,12 @@
   --font-sans:
     var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+
+/*
+ * A page that scrolls to a message of its own turns scroll anchoring off, or the
+ * browser moves away from the message as the content below it loads again. It has
+ * no effect on anything but the page's own scroller.
+ */
+html:has([data-holds-scroll]) {
+  overflow-anchor: none;
+}

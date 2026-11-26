@@ -11,3 +11,4 @@ export * from "./setup";
 export * from "./bill";
 export * from "./opening-stock";
 export * from "./stock-report";
+export * from "./return";

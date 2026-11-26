@@ -3,12 +3,15 @@ import {
   billListSchema,
   billNumberUseSchema,
   billSchema,
+  closedRowListSchema,
   gasListSchema,
   openingStockListSchema,
   openingStockPartiesSchema,
   partyListSchema,
   partySchema,
+  pendingListSchema,
   refusalSchema,
+  returnCustomerListSchema,
   shopSchema,
   staffListSchema,
   staffSchema,
@@ -21,6 +24,8 @@ import {
   type BillListQuery,
   type BillNumberUse,
   type BillNumberUseQuery,
+  type ClosedRowList,
+  type ClosedRowListQuery,
   type GasList,
   type OpeningStockList,
   type OpeningStockListQuery,
@@ -28,6 +33,10 @@ import {
   type Party,
   type PartyList,
   type PartyListQuery,
+  type PendingList,
+  type PendingQuery,
+  type ReturnCustomerList,
+  type ReturnCustomerListQuery,
   type Shop,
   type RefillerSlipNumberUseQuery,
   type Staff,
@@ -82,6 +91,31 @@ export async function fetchRefillerSlipNumberUse(
   return billNumberUseSchema.parse(
     await getJson(`/api/bills/refiller-slip-number-use?${new URLSearchParams(query).toString()}`),
   );
+}
+
+/** The customers Receive empties offers, with what each has pending. */
+export async function fetchReturnCustomers({
+  search = "",
+  page,
+}: ReturnCustomerListQuery): Promise<ReturnCustomerList> {
+  const query = new URLSearchParams({ search, page: String(page) });
+  return returnCustomerListSchema.parse(await getJson(`/api/returns/customers?${query}`));
+}
+
+/** What the customer can return cylinders against on the date. */
+export async function fetchPending(query: PendingQuery): Promise<PendingList> {
+  return pendingListSchema.parse(
+    await getJson(`/api/returns/pending?${new URLSearchParams(query).toString()}`),
+  );
+}
+
+/** One page of the customer's rows with nothing pending. */
+export async function fetchClosedRows({
+  page,
+  ...query
+}: ClosedRowListQuery): Promise<ClosedRowList> {
+  const search = new URLSearchParams({ ...query, page: String(page) });
+  return closedRowListSchema.parse(await getJson(`/api/returns/closed?${search}`));
 }
 
 export async function fetchStartDate(): Promise<StartDate> {

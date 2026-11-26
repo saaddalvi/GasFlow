@@ -2,6 +2,7 @@ const COLOURS = {
   brand: "bg-brand-50 text-brand-700",
   grey: "bg-slate-100 text-slate-600",
   green: "bg-emerald-100 text-emerald-800",
+  amber: "bg-amber-100 text-amber-800",
 };
 
 /** A small coloured pill that says something about what it sits beside. */

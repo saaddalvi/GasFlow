@@ -10,6 +10,7 @@ import type { Database } from "../database";
 import { fromDatabaseDate } from "../database-date";
 import type { Prisma } from "../generated/prisma/client";
 import { Refusal } from "../refusal";
+import { getBillReturns } from "./pending";
 
 // Reading bills. Only the ledger changes them.
 
@@ -24,6 +25,7 @@ export async function getBill(db: Database, billId: string): Promise<Bill> {
     where: { id: billId },
     select: {
       ...SUMMARY,
+      slipNumber: true,
       vehicle: { select: { id: true, plate: true, label: true } },
       notes: true,
       enteredBy: { select: STAFF },
@@ -34,7 +36,11 @@ export async function getBill(db: Database, billId: string): Promise<Bill> {
     throw noSuchBill();
   }
   const { enteredAt, ...rest } = bill;
-  return { ...asReported(rest), enteredAt: enteredAt.toISOString() };
+  return {
+    ...asReported(rest),
+    enteredAt: enteredAt.toISOString(),
+    returns: await getBillReturns(db, bill),
+  };
 }
 
 /** One page of all the bills, the newest first. */

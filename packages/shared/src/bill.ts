@@ -17,6 +17,7 @@ export const billTypeSchema = z.enum([
   "dispatch",
   "send_to_refiller",
   "return_from_refiller",
+  "return_from_customer",
 ]);
 
 export type BillType = z.infer<typeof billTypeSchema>;
@@ -33,6 +34,21 @@ export const PAPER_KIND_NAMES: Record<PaperKind, string> = {
   bill: "Bill",
   cash_memo: "Cash memo",
 };
+
+/**
+ * What staff call a bill that cylinders are pending on, such as "Bill 1234" or
+ * "Opening stock". Only dispatch bills, which have a paper kind, and opening
+ * stock, which has none, can have cylinders pending.
+ */
+export function pendingBillName({
+  paperKind,
+  number,
+}: {
+  paperKind: PaperKind | null;
+  number: string;
+}): string {
+  return paperKind ? `${PAPER_KIND_NAMES[paperKind]} ${number}` : "Opening stock";
+}
 
 /** A party as a bill names it, which may be the shop. */
 export const billPartySchema = z.object({
@@ -57,6 +73,42 @@ export const billLineSchema = z.object({
 
 export type BillLine = z.infer<typeof billLineSchema>;
 
+/** How much of a bill has come back: none, some or all of it. */
+export const returnStatusSchema = z.enum(["open", "partly_returned", "closed"]);
+
+export type ReturnStatus = z.infer<typeof returnStatusSchema>;
+
+const billGasSchema = gasSchema.pick({ id: true, name: true });
+
+/** Counts of the cylinders a bill sent, those since returned and those still pending. */
+const returnCounts = {
+  sent: z.int().positive(),
+  returned: z.int().nonnegative(),
+  pending: z.int().nonnegative(),
+};
+
+/** What has come back against a bill that cylinders can be pending on. */
+export const billReturnsSchema = z.object({
+  ...returnCounts,
+  status: returnStatusSchema,
+  /** One for each gas on the bill, however many lines it is on. */
+  gases: z.array(z.object({ gas: billGasSchema, ...returnCounts })),
+  /** Each posted return with cylinders matched to this bill, the oldest first. */
+  entries: z.array(
+    z.object({
+      id: z.uuid(),
+      number: z.string().min(1),
+      date: dateSchema,
+      /** The cylinders matched to this bill, which may be only part of the return. */
+      quantity: z.int().positive(),
+      gases: z.array(z.object({ gas: billGasSchema, quantity: z.int().positive() })),
+      enteredBy: billStaffSchema,
+    }),
+  ),
+});
+
+export type BillReturns = z.infer<typeof billReturnsSchema>;
+
 /** A bill with everything on it. */
 export const billSchema = z.object({
   id: z.uuid(),
@@ -65,6 +117,8 @@ export const billSchema = z.object({
   paperKind: paperKindSchema.nullable(),
   number: z.string().min(1),
   date: dateSchema,
+  /** The paper return slip's number, if one was noted on a return. */
+  slipNumber: z.string().nullable(),
   /** Only posted bills count. */
   status: z.enum(["posted", "cancelled"]),
   /** Whom the cylinders leave, or null when they join the business. */
@@ -77,6 +131,8 @@ export const billSchema = z.object({
   lines: z.array(billLineSchema),
   enteredBy: billStaffSchema,
   enteredAt: z.iso.datetime(),
+  /** Set on dispatch bills and customers' opening stock, and only on those. */
+  returns: billReturnsSchema.nullable(),
 });
 
 export type Bill = z.infer<typeof billSchema>;
@@ -115,16 +171,19 @@ const MOST_ON_A_LINE = 100_000;
 
 const WHOLE_NUMBER = "Enter each quantity as a whole number.";
 
+/** How many cylinders one entry may move. */
+export const quantitySchema = z
+  .number(WHOLE_NUMBER)
+  .int(WHOLE_NUMBER)
+  .min(1, "Enter a quantity of 1 or more on each line.")
+  .max(MOST_ON_A_LINE, "Enter at most 100000 on a line.");
+
 /** One line of a bill as it is entered. */
 export const newBillLineSchema = z.object(
   {
     gasId: z.uuid("Choose a gas on each line."),
     fillState: fillStateSchema,
-    quantity: z
-      .number(WHOLE_NUMBER)
-      .int(WHOLE_NUMBER)
-      .min(1, "Enter a quantity of 1 or more on each line.")
-      .max(MOST_ON_A_LINE, "Enter at most 100000 on a line."),
+    quantity: quantitySchema,
   },
   "Fill in each line.",
 );

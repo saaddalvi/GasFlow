@@ -135,12 +135,15 @@ In the API:
   date in Indian Standard Time, from `today()` in the same file.
 - Accounts and sign-in go only through the `IdentityProvider` in
   `src/identity.ts`; the real one is `src/clerk-identity.ts`.
-- Only the bill ledger, `src/services/ledger.ts`, changes bills. Each of its
-  operations checks the rules and writes in one transaction. The database keeps
-  bill numbers unique on each paper kind, and a refiller's slip numbers unique
-  for that refiller, ignoring cancelled bills.
+- Only the bill ledger, `src/services/ledger.ts`, changes bills and
+  allocations. Each of its operations checks the rules and writes in one
+  transaction. One that creates an allocation first locks the customer, so that
+  two saves cannot use the same pending cylinders. The database keeps bill
+  numbers unique on each paper kind, and a refiller's slip numbers unique for
+  that refiller, ignoring cancelled bills.
 - Reports only read. They work every figure out from posted bills, and no stock
-  count is stored.
+  count is stored. Pending cylinders are likewise worked out, by
+  `src/services/pending.ts`, from the allocations of posted returns.
 - A calendar date is text such as `2026-11-26`; `src/database-date.ts` converts
   it for the database.
 - To turn a request down, throw a `Refusal` from `src/refusal.ts` with the status

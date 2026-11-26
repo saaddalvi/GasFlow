@@ -87,6 +87,7 @@ enum BillType {
   dispatch
   send_to_refiller
   return_from_refiller
+  return_from_customer
 
   @@map("bill_type")
 }
@@ -131,6 +132,9 @@ model Bill {
   toPartyId   String?    @map("to_party_id") @db.Uuid
   vehicleId   String?    @map("vehicle_id") @db.Uuid
   notes       String?
+  /// The paper return slip's number, noted on a return from a customer. Unlike
+  /// the bill number, it need not be unique.
+  slipNumber  String?    @map("slip_number")
   enteredById String     @map("entered_by_id") @db.Uuid
   enteredAt   DateTime   @map("entered_at") @db.Timestamptz(3)
   fromParty   Party?     @relation("bills_from", fields: [fromPartyId], references: [id], onDelete: Restrict)
@@ -154,19 +158,42 @@ model Bill {
 }
 
 model BillLine {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  billId    String    @map("bill_id") @db.Uuid
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  billId    String       @map("bill_id") @db.Uuid
   /// The line's place on its bill, counted from 1.
-  lineNo    Int       @map("line_no")
-  gasId     String    @map("gas_id") @db.Uuid
-  fillState FillState @map("fill_state")
+  lineNo    Int          @map("line_no")
+  gasId     String       @map("gas_id") @db.Uuid
+  fillState FillState    @map("fill_state")
   /// More than zero, by a check in the migration.
   quantity  Int
-  bill      Bill      @relation(fields: [billId], references: [id])
-  gas       Gas       @relation(fields: [gasId], references: [id])
+  bill      Bill         @relation(fields: [billId], references: [id])
+  gas       Gas          @relation(fields: [gasId], references: [id])
+  /// On a return, what its quantity is matched to.
+  clears    Allocation[] @relation("clearing_line")
+  /// On a dispatch bill or opening stock, what has been matched to it.
+  clearedBy Allocation[] @relation("cleared_line")
 
   @@unique([billId, lineNo])
   @@map("bill_lines")
+}
+
+/// The part of a return that is matched to a line of a dispatch bill or opening
+/// stock for the same customer and gas, dated no later than the return. It counts
+/// only while the return is posted.
+model Allocation {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// The line of the return.
+  clearingLineId String   @map("clearing_line_id") @db.Uuid
+  /// The line whose pending cylinders it clears.
+  clearedLineId  String   @map("cleared_line_id") @db.Uuid
+  /// More than zero, by a check in the migration.
+  quantity       Int
+  clearingLine   BillLine @relation("clearing_line", fields: [clearingLineId], references: [id])
+  clearedLine    BillLine @relation("cleared_line", fields: [clearedLineId], references: [id])
+
+  @@unique([clearingLineId, clearedLineId])
+  @@index([clearedLineId])
+  @@map("allocations")
 }
 
 /// The last number issued to bills of one prefix and date.
