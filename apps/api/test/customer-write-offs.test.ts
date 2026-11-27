@@ -315,12 +315,13 @@ test("a customer write-off cannot be corrected, even by an admin", async () => {
   const message = "A write-off from a customer cannot be corrected. Cancel it and enter it again.";
 
   // As the correction form would send it, had it taken the write-off for the shop's.
-  for (const person of [admin, agency.staff]) {
-    const response = await postCorrection(writtenOff, agency.correctionFor(writtenOff), person);
-
-    expect(response.statusCode).toBe(409);
-    expect(response.json()).toMatchObject({ message });
-  }
+  const asAdmin = await postCorrection(writtenOff, agency.correctionFor(writtenOff), admin);
+  expect(asAdmin.statusCode).toBe(409);
+  expect(asAdmin.json()).toMatchObject({ message });
+  // Staff are told first that write-offs are for an admin to correct.
+  const asStaff = await postCorrection(writtenOff, agency.correctionFor(writtenOff), agency.staff);
+  expect(asStaff.statusCode).toBe(403);
+  expect(asStaff.json()).toMatchObject({ message: "Only an admin can correct a write-off." });
   // Nor can it be made some other type of bill, or one from a refiller.
   const response = await postCorrection(writtenOff, agency.addCylindersFor(), admin);
   expect(response.json()).toMatchObject({ message });

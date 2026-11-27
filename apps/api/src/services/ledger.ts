@@ -172,13 +172,14 @@ export function correctBill(
     correction.type === "opening_stock" ? null : { ...correction, ...entryDetails(correction) };
   const save = db.$transaction(async (tx) => {
     const bill = await lockBill(tx, billId);
-    const uncorrectable = whyUncorrectable(bill);
-    if (uncorrectable) {
-      throw new Refusal(409, uncorrectable);
-    }
+    // Whether they may is settled first, as it is for cancelling.
     const notAllowed = whyNotCorrect(bill, staff, today(clock));
     if (notAllowed) {
       throw new Refusal(403, notAllowed);
+    }
+    const uncorrectable = whyUncorrectable(bill);
+    if (uncorrectable) {
+      throw new Refusal(409, uncorrectable);
     }
     if (correction.type !== bill.type) {
       throw new Refusal(409, "The type of a bill cannot be changed. Cancel it and enter it again.");

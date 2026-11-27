@@ -1003,6 +1003,18 @@ test("whether someone may correct a bill is settled before what stands in the wa
   expect(response.json()).not.toHaveProperty("blockingBills");
 });
 
+test("whether someone may correct a bill is settled before whether it can be corrected", async () => {
+  const agency = await start();
+  const { customer, dispatch, cancel, signIn, correctionFor, postCorrection } = agency;
+  const colleague = await signIn({ displayName: "Meena Iyer" });
+  const sent = await dispatch(customer.id);
+  await cancel(sent);
+
+  const response = await postCorrection(sent, correctionFor(sent, six(agency)), colleague);
+
+  expect(response.statusCode).toBe(403);
+});
+
 test("a correction that changes nothing keeps no version", async () => {
   const agency = await sendAndReceive();
   const { sent, correct, enter, shop } = agency;
