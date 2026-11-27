@@ -17,7 +17,7 @@
 
 ## Comments
 
-**27 November 2026: built in commit `53158df`, waiting on a check by hand.** Not pushed, so CI has not run on it.
+**27 November 2026: built in commit `53158df`, waiting on a check by hand.** Pushed since, as recorded at the end.
 
 Still to do, signed in with real accounts. No migration is new.
 
@@ -56,4 +56,15 @@ For the project owner to decide:
 - With more than three gases the card is split into several tables.
 - The range ends today unless a later date is chosen, **Full history** included, so bills dated after today are left off. A party's page counts them in what it holds.
 - The card's picker offers inactive parties too.
+
+**27 November 2026: pushed.**
+
+- Pushed up to `2b554b3`, and [CI passed on it](https://github.com/saaddalvi/GasFlow/actions/runs/45998581178).
+- The checks under "Still to do" are not recorded as done.
+
+**27 November 2026: completed** in commit `53158df`.
+
+- The project owner asked for the ticket to be marked complete. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
+- The code committed in `53158df` has not changed since.
+- The decisions listed for the project owner are not recorded as settled.
 
