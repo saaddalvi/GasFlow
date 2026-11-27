@@ -6,14 +6,14 @@
 
 **Status:** ready-for-agent
 
-- [ ] An admin chooses a customer, then a dispatch bill or opening stock with pending cylinders, a gas, a quantity, a date and a reason
-- [ ] The quantity is limited to that bill's pending cylinders, the date cannot be before the bill's, and a customer write-off is never unmatched
-- [ ] Pending and the customer's holding fall, the shop is unchanged, and the business total falls
-- [ ] The dispatch bill page shows sent, returned, written off and pending, lists each write-off, and counts write-offs towards its tag
-- [ ] A customer write-off cannot be corrected, only cancelled and entered again; cancelling restores pending
-- [ ] A dispatch bill or opening stock with a write-off is protected from cancellation and contradicting corrections, like one with returns
-- [ ] A write-off and a return against the same pending cylinders sent at the same moment cannot both over-clear the bill
-- [ ] A customer's holding of each gas still equals pending minus unmatched
+- [x] An admin chooses a customer, then a dispatch bill or opening stock with pending cylinders, a gas, a quantity, a date and a reason
+- [x] The quantity is limited to that bill's pending cylinders, the date cannot be before the bill's, and a customer write-off is never unmatched
+- [x] Pending and the customer's holding fall, the shop is unchanged, and the business total falls
+- [x] The dispatch bill page shows sent, returned, written off and pending, lists each write-off, and counts write-offs towards its tag
+- [x] A customer write-off cannot be corrected, only cancelled and entered again; cancelling restores pending
+- [x] A dispatch bill or opening stock with a write-off is protected from cancellation and contradicting corrections, like one with returns
+- [x] A write-off and a return against the same pending cylinders sent at the same moment cannot both over-clear the bill
+- [x] A customer's holding of each gas still equals pending minus unmatched
 
 ## Comments
 
@@ -54,3 +54,10 @@ For later tickets:
 
 - Tickets 15 and 16: a bill's pending is sent less returned less written off. A bill can be closed with nothing returned.
 - Ticket 20: write-offs have allocations too, so a stock card showing the bill each return went against may want the same for them.
+
+**27 November 2026: completed** in commit `91cb4e3`.
+
+- Pushed up to `ba975b6`, and [CI passed on it](https://github.com/saaddalvi/GasFlow/actions/runs/45969924822).
+- The project owner asked for the ticket to be marked complete. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
+- `pnpm check`, with 597 tests, and `pnpm build` passed on the code committed in `91cb4e3`, which has not changed since.
+- The decisions listed for the project owner are not recorded as settled.
