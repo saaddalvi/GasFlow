@@ -18,6 +18,7 @@ import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import { ActionForm } from "@/components/action-form";
 import { BillDateField } from "@/components/bill-date-field";
 import { buttonStyles } from "@/components/button-styles";
+import { DaysOut, OVERDUE_ROW } from "@/components/days-out";
 import { Field, SelectField } from "@/components/fields";
 import { asNewLines, blankLine, LineList, nextKey, type FormLine } from "@/components/line-fields";
 import { LoadError } from "@/components/load-error";
@@ -98,11 +99,18 @@ function cylinders(typed: string): number {
   return Number.isInteger(quantity) && quantity > 0 ? quantity : 0;
 }
 
-export function ReceiveForm({ choices }: { choices: FormChoices | null }) {
+export function ReceiveForm({
+  choices,
+  startingCustomer,
+}: {
+  choices: FormChoices | null;
+  /** The customer the form starts with, if the address names one. */
+  startingCustomer: Choice | null;
+}) {
   const shown = useLastGiven(choices);
 
   return shown ? (
-    <Form choices={shown} />
+    <Form choices={shown} startingCustomer={startingCustomer} />
   ) : (
     <LoadError>
       The form could not be loaded. Check that the API is running, then reload the page.
@@ -110,8 +118,14 @@ export function ReceiveForm({ choices }: { choices: FormChoices | null }) {
   );
 }
 
-function Form({ choices: { startDate, today, gases } }: { choices: FormChoices }) {
-  const [customer, setCustomer] = useState<Choice | null>(null);
+function Form({
+  choices: { startDate, today, gases },
+  startingCustomer,
+}: {
+  choices: FormChoices;
+  startingCustomer: Choice | null;
+}) {
+  const [customer, setCustomer] = useState(startingCustomer);
   const [date, setDate] = useState(today);
   const [slipNumber, setSlipNumber] = useState("");
   // Kept by bill and gas, so that a row keeps its entry while the list is loaded again.
@@ -258,8 +272,14 @@ function Form({ choices: { startDate, today, gases } }: { choices: FormChoices }
         <ActionForm action={submit} submitLabel="Save returns">
           <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              {/* On load only. After a save it would scroll the confirmation away. */}
-              <CustomerPicker chosen={customer} onChoose={choose} focused={changesTried === 0} />
+              {/* On load only, as after a save it would scroll the confirmation
+                  away. Not with a customer already chosen, whose name typing
+                  would then replace. */}
+              <CustomerPicker
+                chosen={customer}
+                onChoose={choose}
+                focused={changesTried === 0 && !startingCustomer}
+              />
             </div>
             <BillDateField startDate={startDate} today={today} value={date} onChange={setDate} />
             <Field
@@ -402,14 +422,14 @@ function PendingRowFields({
   const name = `${pendingBillName(row.bill)}, ${row.gas.name}`;
 
   return (
-    <li className="px-4 py-3">
+    <li
+      className={`px-4 py-3 first:rounded-t-lg last:rounded-b-lg ${row.overdue ? OVERDUE_ROW : ""}`}
+    >
       <fieldset className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto_18rem] md:items-center">
         <legend className="sr-only">{name}</legend>
         <div className="flex items-start justify-between gap-3 md:block">
           <RowHeading row={row} />
-          <p className="whitespace-nowrap text-slate-500">
-            {row.daysOut === 1 ? "1 day out" : `${row.daysOut} days out`}
-          </p>
+          <DaysOut daysOut={row.daysOut} overdue={row.overdue} />
         </div>
         <RowCounts row={row} />
         {/* On the narrowest phones the fill state drops below, so that it can be read. */}

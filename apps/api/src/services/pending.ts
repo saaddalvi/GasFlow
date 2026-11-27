@@ -8,6 +8,8 @@ import type {
   SplitQuery,
   PendingList,
   PendingQuery,
+  PendingReturnList,
+  PendingReturnListQuery,
   PendingRow,
   ReturnCustomerList,
   ReturnCustomerListQuery,
@@ -18,13 +20,14 @@ import type { Database, Transaction } from "../database";
 import { fromDatabaseDate } from "../database-date";
 import { Prisma } from "../generated/prisma/client";
 import { noSuchGas } from "./gases";
+import { getOverdueLimit } from "./overdue-limit";
 import { listParties, noSuchParty } from "./parties";
 
 // What customers have yet to return. It is worked out from the posted bills and
 // the allocations of posted returns and write-offs, and never stored. What came
 // back beyond it is in unmatched.ts.
 
-const CLOSED_PAGE_SIZE = 50;
+const PAGE_SIZE = 50;
 
 /**
  * Each line that returns and write-offs can be matched to: those of posted
@@ -34,8 +37,8 @@ const CLOSED_PAGE_SIZE = 50;
  */
 const CLEARABLE_LINES = Prisma.sql`
   SELECT l.id AS line_id, l.line_no, l.gas_id, l.quantity AS sent,
-         b.id AS bill_id, b.to_party_id AS customer_id, b.type, b.paper_kind,
-         b.number, b.date, b.entered_at,
+         b.id AS bill_id, b.to_party_id AS customer_id, p.name AS customer_name,
+         p.active AS customer_active, b.type, b.paper_kind, b.number, b.date, b.entered_at,
          cleared.returned, cleared.written_off,
          l.quantity - cleared.returned - cleared.written_off AS pending
     FROM bills b
@@ -164,10 +167,36 @@ export async function listPending(
   { customerId, date }: PendingQuery,
 ): Promise<PendingList> {
   await refuseUnknownCustomer(db, customerId);
-  const now = today(clock);
+  const daysOutSince = await countingDaysOut(db, clock);
   const rows = await findPendingRows(db, customerId, date);
+  return { rows: rows.map((row) => ({ ...row, ...daysOutSince(row.bill.date) })) };
+}
+
+/** One page of the rows with cylinders pending from any customer, the longest out first. */
+export async function listPendingReturns(
+  db: Database,
+  clock: Clock,
+  { page }: PendingReturnListQuery,
+): Promise<PendingReturnList> {
+  const pending = Prisma.sql`
+    ${rowsWhere(Prisma.sql`TRUE`)}
+    HAVING SUM(c.pending) > 0
+  `;
+  const daysOutSince = await countingDaysOut(db, clock);
+  const { rows, total } = await pageOfRows(db, pending, OLDEST_FIRST, page);
   return {
-    rows: rows.map((row) => ({ ...row, daysOut: daysBetween(row.bill.date, now) })),
+    rows: rows.map((row) => {
+      const { customerId: id, customerName: name, customerActive: active } = row;
+      const pendingRow = asRow(row);
+      return {
+        ...pendingRow,
+        customer: { id, name, active },
+        ...daysOutSince(pendingRow.bill.date),
+      };
+    }),
+    total,
+    page,
+    pageSize: PAGE_SIZE,
   };
 }
 
@@ -223,17 +252,8 @@ export async function listClosedRows(
     ${rowsOf(customerId, date)}
     HAVING SUM(c.pending) <= 0
   `;
-  const [rows, [{ total }]] = await Promise.all([
-    db.$queryRaw<Row[]>`
-      ${closed}
-      ORDER BY ${NEWEST_FIRST}, MIN(c.line_no)
-      LIMIT ${CLOSED_PAGE_SIZE} OFFSET ${(page - 1) * CLOSED_PAGE_SIZE}
-    `,
-    db.$queryRaw<[{ total: number }]>`
-      SELECT COUNT(*)::int AS total FROM (${closed}) AS closed
-    `,
-  ]);
-  return { rows: rows.map(asRow), total, page, pageSize: CLOSED_PAGE_SIZE };
+  const { rows, total } = await pageOfRows(db, closed, NEWEST_FIRST, page);
+  return { rows: rows.map(asRow), total, page, pageSize: PAGE_SIZE };
 }
 
 /** One page of the active customers by name, each with what they have pending. */
@@ -393,6 +413,9 @@ async function refuseUnknownCustomer(db: Database, customerId: string): Promise<
 
 interface Row {
   billId: string;
+  customerId: string;
+  customerName: string;
+  customerActive: boolean;
   type: PendingRow["bill"]["type"];
   paperKind: PendingRow["bill"]["paperKind"];
   number: string;
@@ -406,25 +429,56 @@ interface Row {
 }
 
 /**
- * A query for one row for each bill and gas of the customer's dated on or before
- * the date, for its caller to narrow and order.
+ * A query for one row for each bill and gas among the lines that meet the
+ * condition, for its caller to narrow and order.
  */
-function rowsOf(customerId: string, date: string): Prisma.Sql {
+function rowsWhere(condition: Prisma.Sql): Prisma.Sql {
   return Prisma.sql`
     WITH lines AS (${CLEARABLE_LINES})
-    SELECT c.bill_id AS "billId", c.type::text AS type, c.paper_kind::text AS "paperKind",
+    SELECT c.bill_id AS "billId", c.customer_id AS "customerId",
+           c.customer_name::text AS "customerName", c.customer_active AS "customerActive",
+           c.type::text AS type, c.paper_kind::text AS "paperKind",
            c.number::text AS number, c.date,
            c.gas_id AS "gasId", g.name::text AS "gasName",
            SUM(c.sent)::int AS sent, SUM(c.returned)::int AS returned,
            SUM(c.written_off)::int AS "writtenOff", SUM(c.pending)::int AS pending
       FROM lines c JOIN gases g ON g.id = c.gas_id
-     WHERE c.customer_id = ${customerId}::uuid AND c.date <= ${date}::date
-     GROUP BY c.bill_id, c.type, c.paper_kind, c.number, c.date, c.entered_at, c.gas_id, g.name
+     WHERE ${condition}
+     GROUP BY c.bill_id, c.customer_id, c.customer_name, c.customer_active, c.type, c.paper_kind,
+              c.number, c.date, c.entered_at, c.gas_id, g.name
   `;
+}
+
+/** The rows of the customer's bills dated on or before the date. */
+function rowsOf(customerId: string, date: string): Prisma.Sql {
+  return rowsWhere(Prisma.sql`c.customer_id = ${customerId}::uuid AND c.date <= ${date}::date`);
+}
+
+/** One page of the rows the query gives, in the order, and how many it gives in all. */
+async function pageOfRows(
+  db: Database,
+  query: Prisma.Sql,
+  order: Prisma.Sql,
+  page: number,
+): Promise<{ rows: Row[]; total: number }> {
+  const [rows, [{ total }]] = await Promise.all([
+    db.$queryRaw<Row[]>`
+      ${query}
+      ORDER BY ${order}, MIN(c.line_no)
+      LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}
+    `,
+    db.$queryRaw<[{ total: number }]>`
+      SELECT COUNT(*)::int AS total FROM (${query}) AS counted
+    `,
+  ]);
+  return { rows, total };
 }
 
 function asRow({
   billId,
+  type,
+  paperKind,
+  number,
   date,
   gasId,
   gasName,
@@ -432,15 +486,27 @@ function asRow({
   returned,
   writtenOff,
   pending,
-  ...bill
 }: Row): PendingRow {
   return {
-    bill: { id: billId, date: fromDatabaseDate(date), ...bill },
+    bill: { id: billId, type, paperKind, number, date: fromDatabaseDate(date) },
     gas: { id: gasId, name: gasName },
     sent,
     returned,
     writtenOff,
     pending,
+  };
+}
+
+/**
+ * Gives, for the date of a bill, how long cylinders pending on it have been out
+ * as of today, and whether that is over the limit as it stands.
+ */
+async function countingDaysOut(db: Database, clock: Clock) {
+  const limit = await getOverdueLimit(db);
+  const now = today(clock);
+  return (billDate: string) => {
+    const daysOut = daysBetween(billDate, now);
+    return { daysOut, overdue: daysOut > limit };
   };
 }
 

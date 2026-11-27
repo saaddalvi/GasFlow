@@ -8,6 +8,7 @@ import { billRoutes } from "./routes/bills";
 import { gasRoutes } from "./routes/gases";
 import { meRoutes } from "./routes/me";
 import { openingStockRoutes } from "./routes/opening-stock";
+import { overdueLimitRoutes } from "./routes/overdue-limit";
 import { partyRoutes } from "./routes/parties";
 import { reportRoutes } from "./routes/reports";
 import { returnRoutes } from "./routes/returns";
@@ -40,6 +41,7 @@ export function buildApp(dependencies: AppDependencies, options: FastifyServerOp
   gasRoutes(app, dependencies);
   meRoutes(app);
   openingStockRoutes(app, dependencies);
+  overdueLimitRoutes(app, dependencies);
   partyRoutes(app, dependencies);
   reportRoutes(app, dependencies);
   returnRoutes(app, dependencies);

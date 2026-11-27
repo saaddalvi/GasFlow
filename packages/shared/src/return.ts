@@ -99,17 +99,42 @@ export const pendingRowSchema = z.object({
 
 export type PendingRow = z.infer<typeof pendingRowSchema>;
 
-/** The rows with cylinders pending, the oldest first. */
-export const pendingListSchema = z.object({
-  rows: z.array(
-    pendingRowSchema.extend({
-      /** The days since the bill's date, which for opening stock is the start date. */
-      daysOut: z.int().nonnegative(),
-    }),
-  ),
+/** A row with cylinders pending, and how long they have been out. */
+const daysOutRowSchema = pendingRowSchema.extend({
+  /** The days since the bill's date, which for opening stock is the start date. */
+  daysOut: z.int().nonnegative(),
+  /** Whether the days out exceed the overdue limit. */
+  overdue: z.boolean(),
 });
 
+/** The rows with cylinders pending, the oldest first. */
+export const pendingListSchema = z.object({ rows: z.array(daysOutRowSchema) });
+
 export type PendingList = z.infer<typeof pendingListSchema>;
+
+/** Asks for every customer's pending cylinders, a page at a time. */
+export const pendingReturnListQuerySchema = z.object({ page: queryPage });
+
+export type PendingReturnListQuery = z.infer<typeof pendingReturnListQuerySchema>;
+
+/** One gas on one dispatch bill or opening stock, with whose cylinders are out on it. */
+export const pendingReturnSchema = daysOutRowSchema.extend({
+  /** Nothing can be received from an inactive customer. */
+  customer: partySchema.pick({ id: true, name: true, active: true }),
+});
+
+export type PendingReturn = z.infer<typeof pendingReturnSchema>;
+
+/** One page of what every customer has yet to return, the longest out first. */
+export const pendingReturnListSchema = z.object({
+  rows: z.array(pendingReturnSchema),
+  /** How many such rows there are, on every page together. */
+  total: z.int().nonnegative(),
+  page: z.int().positive(),
+  pageSize: z.int().positive(),
+});
+
+export type PendingReturnList = z.infer<typeof pendingReturnListSchema>;
 
 /** Asks for the rows with nothing pending, a page at a time. */
 export const closedRowListQuerySchema = pendingQuerySchema.extend({ page: queryPage });

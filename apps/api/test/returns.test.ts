@@ -72,6 +72,8 @@ test("pending cylinders are listed oldest first, one row for each bill and gas",
     writtenOff: 0,
     pending: sent,
     daysOut,
+    // None is past the limit of 30 days.
+    overdue: false,
   });
 
   expect(await pending(customer.id)).toEqual([

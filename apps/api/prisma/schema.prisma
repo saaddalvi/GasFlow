@@ -59,6 +59,17 @@ model Setup {
   @@map("setup")
 }
 
+/// The overdue limit an admin has chosen: cylinders are overdue once their days
+/// out exceed it. It has one row at most, kept to the id 1 by a check in the
+/// migration, and none until an admin changes the limit from what it starts at.
+model OverdueLimit {
+  id   Int @id @default(1)
+  /// More than zero, by a check in the migration.
+  days Int
+
+  @@map("overdue_limit")
+}
+
 /// A staff member who has signed in. The row outlives their account, so that
 /// bills can go on showing who entered and cancelled them. The admin role is not
 /// stored here; the identity provider holds it.

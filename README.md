@@ -163,7 +163,9 @@ In the API:
   `src/services/pending.ts`, from the allocations of posted returns and
   write-offs. Unmatched
   ones are whatever a return's lines hold beyond their allocations, worked out
-  by `src/services/unmatched.ts`.
+  by `src/services/unmatched.ts`. Whether pending ones are overdue is worked out
+  as they are read, against the limit in `src/services/overdue-limit.ts`, so a
+  new limit shows at once.
 - A calendar date is text such as `2026-11-26`; `src/database-date.ts` converts
   it for the database.
 - To turn a request down, throw a `Refusal` from `src/refusal.ts` with the status

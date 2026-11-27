@@ -8,9 +8,11 @@ import {
   gasListSchema,
   openingStockListSchema,
   openingStockPartiesSchema,
+  overdueLimitSchema,
   partyListSchema,
   partySchema,
   pendingListSchema,
+  pendingReturnListSchema,
   refusalSchema,
   returnCustomerListSchema,
   shopSchema,
@@ -35,11 +37,14 @@ import {
   type OpeningStockList,
   type OpeningStockListQuery,
   type OpeningStockParties,
+  type OverdueLimit,
   type Party,
   type PartyList,
   type PartyListQuery,
   type PendingList,
   type PendingQuery,
+  type PendingReturnList,
+  type PendingReturnListQuery,
   type ReturnCustomerList,
   type ReturnCustomerListQuery,
   type Shop,
@@ -115,6 +120,18 @@ export async function fetchPending(query: PendingQuery): Promise<PendingList> {
   return pendingListSchema.parse(
     await getJson(`/api/returns/pending?${new URLSearchParams(query).toString()}`),
   );
+}
+
+/** One page of what every customer has yet to return. */
+export async function fetchPendingReturns({
+  page,
+}: PendingReturnListQuery): Promise<PendingReturnList> {
+  return pendingReturnListSchema.parse(await getJson(`/api/reports/pending-returns?page=${page}`));
+}
+
+/** The days out that cylinders must exceed to be overdue. */
+export async function fetchOverdueLimit(): Promise<OverdueLimit> {
+  return overdueLimitSchema.parse(await getJson("/api/overdue-limit"));
 }
 
 /** How "Fill oldest first" would split a total of a gas. It saves nothing. */

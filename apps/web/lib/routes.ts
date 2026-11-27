@@ -20,6 +20,14 @@ export function correctBillPath(billId: string): string {
 /** Where cylinders coming back from a customer are recorded. */
 export const RECEIVE_EMPTIES_PATH = "/returns/new";
 
+/** Receive empties with this customer already chosen. */
+export function receiveEmptiesFromPath(customerId: string): string {
+  return `${RECEIVE_EMPTIES_PATH}?${new URLSearchParams({ customerId }).toString()}`;
+}
+
+/** What customers have yet to return, the longest out first. */
+export const PENDING_RETURNS_PATH = "/returns/pending";
+
 /** Returned cylinders that have yet to be matched to a bill. */
 export const UNMATCHED_RETURNS_PATH = "/returns/unmatched";
 
