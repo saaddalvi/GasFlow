@@ -15,7 +15,7 @@
 
 ## Comments
 
-**27 November 2026: built in commit `5826e25`, waiting on a check by hand.** Not pushed, so CI has not run on it.
+**27 November 2026: built in commit `5826e25`, waiting on a check by hand.** Pushed since, as recorded at the end.
 
 Still to do, signed in with real accounts. No migration is new.
 
@@ -50,4 +50,11 @@ For later tickets:
 - Ticket 16: its list takes opening stock too, so it needs more than `findPendingDispatchIds` in `services/pending.ts`.
 - Ticket 17: the bill list narrows by part of a party's name, not by one party. A party's page needs the latter.
 - Ticket 21: dashboard figures can link to the list with `type`, `from`, `to` and `pending=true`.
+
+**27 November 2026: completed** in commit `5826e25`.
+
+- Pushed up to `90729ee`, and [CI passed on it](https://github.com/saaddalvi/GasFlow/actions/runs/45975252389).
+- The project owner asked for the ticket to be marked complete. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
+- The code committed in `5826e25` has not changed since. The test that timed out in one local run has not been identified.
+- The decisions listed for the project owner are not recorded as settled.
 
