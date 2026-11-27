@@ -5,6 +5,7 @@ import {
   billTypeSchema,
   PAPER_KIND_NAMES,
   PAPER_KINDS,
+  BILL_TYPE_NAMES,
   type BillList,
   type BillListQuery,
 } from "@gasflow/shared";
@@ -19,7 +20,7 @@ import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyPage, Pagination } from "@/components/pagination";
 import { fetchBills, orNull } from "@/lib/api";
-import { BILL_STATUS_NAMES, BILL_TYPE_NAMES } from "@/lib/bill-names";
+import { BILL_STATUS_NAMES } from "@/lib/bill-names";
 import { billListSearch } from "@/lib/bill-list-search";
 import { BILLS_PATH, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
 

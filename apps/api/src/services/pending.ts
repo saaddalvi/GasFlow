@@ -14,6 +14,7 @@ import type {
   ReturnCustomerList,
   ReturnCustomerListQuery,
   ReturnCounts,
+  StockCardMatchedBill,
 } from "@gasflow/shared";
 import { today, type Clock } from "../clock";
 import type { Database, Transaction } from "../database";
@@ -126,6 +127,39 @@ export function findAllocationsToBill(
       JOIN bills cb ON cb.id = cl.bill_id
      WHERE l.bill_id = ${billId}::uuid AND cb.status = 'posted'
      ORDER BY cb.date, cb.entered_at, cb.id, l.line_no
+  `;
+}
+
+/** The cylinders of one gas on a return or write-off that are matched to one bill. */
+export interface MatchMade {
+  clearingBillId: string;
+  gasId: string;
+  /** The bill they are matched to, which is a dispatch bill or opening stock. */
+  billId: string;
+  type: StockCardMatchedBill["type"];
+  paperKind: PendingRow["bill"]["paperKind"];
+  number: string;
+  quantity: number;
+}
+
+/**
+ * What these returns and write-offs have matched of each gas to each bill, the
+ * oldest of those bills first.
+ */
+export function findMatchesMadeBy(db: Database, clearingBillIds: string[]): Promise<MatchMade[]> {
+  return db.$queryRaw<MatchMade[]>`
+    SELECT cl.bill_id AS "clearingBillId", cl.gas_id AS "gasId", c.bill_id AS "billId",
+           c.type::text AS type, c.paper_kind::text AS "paperKind", c.number::text AS number,
+           SUM(a.quantity)::int AS quantity
+      FROM allocations a
+      JOIN bill_lines cl ON cl.id = a.clearing_line_id
+      JOIN bill_lines l ON l.id = a.cleared_line_id
+      JOIN (SELECT id AS bill_id, type, paper_kind, number, date, entered_at FROM bills) c
+        ON c.bill_id = l.bill_id
+     WHERE cl.bill_id = ANY(${clearingBillIds}::uuid[])
+     GROUP BY cl.bill_id, cl.gas_id, c.bill_id, c.type, c.paper_kind, c.number, c.date,
+              c.entered_at
+     ORDER BY ${OLDEST_FIRST}
   `;
 }
 
@@ -269,6 +303,7 @@ export async function listReturnCustomers(
     ...query,
     type: "customer",
     inactive: false,
+    holders: false,
   });
   const ids = parties.map((party) => party.id);
   const counts = await db.$queryRaw<{ customerId: string; pending: number }[]>`

@@ -5,6 +5,7 @@ import {
   newPartySchema,
   PARTY_TYPES,
   partyChangesSchema,
+  PARTY_TYPE_NAMES,
   type Party,
 } from "@gasflow/shared";
 import { useRouter } from "next/navigation";
@@ -13,7 +14,6 @@ import { ActionForm } from "@/components/action-form";
 import { CheckboxField, Field, SelectField, TextAreaField } from "@/components/fields";
 import type { Outcome } from "@/lib/api";
 import { changedOnly } from "@/lib/changed-only";
-import { PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { addParty, saveParty } from "./actions";
 import { PARTIES_PATH, partyPath } from "@/lib/routes";
 

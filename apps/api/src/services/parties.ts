@@ -1,4 +1,5 @@
 import {
+  holdsCylinders,
   PARTY_TYPES,
   partySchema,
   type NewParty,
@@ -15,9 +16,10 @@ const PAGE_SIZE = 50;
 
 /** One page of customers, refillers and suppliers, by name. */
 export async function listParties(db: Database, query: PartyListQuery) {
-  const { search, type, inactive, page } = query;
+  const { search, type, inactive, holders, page } = query;
+  const types = type ? [type] : [...PARTY_TYPES];
   const where = {
-    type: type ?? { in: [...PARTY_TYPES] },
+    type: { in: holders ? types.filter(holdsCylinders) : types },
     active: inactive ? undefined : true,
     name: search ? containing(search) : undefined,
   };

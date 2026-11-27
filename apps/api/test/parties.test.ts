@@ -297,6 +297,23 @@ test.each([
   expect(await listNames(query)).toEqual(names);
 });
 
+test("the party list can be narrowed to those whose cylinders are counted", async () => {
+  const { addParty, addCustomers, listNames } = await startAsStaff();
+  await addCustomers("City Hospital");
+  await addParty({ type: "refiller", name: "Deccan Gases" });
+  await addParty({ type: "supplier", name: "Everest Cylinders" });
+  await addParty({ type: "customer", name: "Ruby Clinic", active: false });
+
+  expect(await listNames("holders=true")).toEqual(["City Hospital", "Deccan Gases"]);
+  expect(await listNames("holders=true&inactive=true")).toEqual([
+    "City Hospital",
+    "Deccan Gases",
+    "Ruby Clinic",
+  ]);
+  // One type asked for narrows it further.
+  expect(await listNames("holders=true&type=supplier")).toEqual([]);
+});
+
 test("the party list cannot be narrowed to the shop", async () => {
   const { app, headers } = await startAsStaff();
 

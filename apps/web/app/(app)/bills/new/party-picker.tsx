@@ -1,9 +1,8 @@
 "use client";
 
-import { partyListSchema, type Party, type PartyType } from "@gasflow/shared";
+import { partyListSchema, PARTY_TYPE_NAMES, type Party, type PartyType } from "@gasflow/shared";
 import { buttonStyles } from "@/components/button-styles";
 import { SearchPicker } from "@/components/search-picker";
-import { PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { NEW_BILL_PATH } from "@/lib/routes";
 
 /** The party on a bill, as much of one as the picker shows. */

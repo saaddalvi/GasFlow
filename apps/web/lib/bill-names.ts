@@ -1,28 +1,13 @@
 import {
+  BILL_TYPE_NAMES,
   PAPER_KIND_NAMES,
+  WRITE_OFF_REASON_NAMES,
   type Bill,
   type BillLine,
   type BillStatus,
-  type BillType,
   type CancelReason,
   type FillState,
-  type WriteOffReason,
 } from "@gasflow/shared";
-
-export const BILL_TYPE_NAMES: Record<BillType, string> = {
-  opening_stock: "Opening stock",
-  dispatch: "Dispatch",
-  send_to_refiller: "Send to refiller",
-  return_from_refiller: "Return from refiller",
-  return_from_customer: "Return",
-  add_cylinders: "Add cylinders",
-  write_off: "Write-off",
-};
-
-export const WRITE_OFF_REASON_NAMES: Record<WriteOffReason, string> = {
-  scrapped: "Scrapped",
-  lost: "Lost",
-};
 
 export const FILL_STATE_NAMES: Record<FillState, string> = {
   filled: "Filled",

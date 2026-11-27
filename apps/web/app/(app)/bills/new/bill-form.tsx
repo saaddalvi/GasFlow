@@ -7,6 +7,8 @@ import {
   newCustomerWriteOffSchema,
   WRITE_OFF_REASONS,
   whyNotEnter,
+  BILL_TYPE_NAMES,
+  WRITE_OFF_REASON_NAMES,
   type Bill,
   type FillState,
   type Gas,
@@ -32,7 +34,7 @@ import {
 } from "@/components/line-fields";
 import { LoadError } from "@/components/load-error";
 import type { Outcome } from "@/lib/api";
-import { BILL_TYPE_NAMES, FILL_STATE_NAMES, WRITE_OFF_REASON_NAMES } from "@/lib/bill-names";
+import { FILL_STATE_NAMES } from "@/lib/bill-names";
 import { holdEnter } from "@/lib/hold-enter";
 import { billPath, BILLS_PATH } from "@/lib/routes";
 import { useLastGiven } from "@/lib/use-last-given";

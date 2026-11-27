@@ -24,6 +24,7 @@ import {
   staffListSchema,
   staffSchema,
   startDateSchema,
+  stockCardSchema,
   stockReportSchema,
   todaySchema,
   unmatchedListSchema,
@@ -65,6 +66,8 @@ import {
   type Staff,
   type StaffList,
   type StartDate,
+  type StockCard,
+  type StockCardQuery,
   type StockReport,
   type StockReportQuery,
   type UnmatchedList,
@@ -75,6 +78,7 @@ import { refresh } from "next/cache";
 import { balanceRegisterSearch } from "./balance-register-search";
 import { billListSearch } from "./bill-list-search";
 import { partyListSearch } from "./party-list-search";
+import { stockCardSearch } from "./stock-card-search";
 
 // Everything here runs on the web server, never in the browser, and asks the API
 // on behalf of the signed-in staff member.
@@ -226,6 +230,24 @@ export async function fetchDayLedger({ date }: DayLedgerQuery): Promise<DayLedge
 export async function fetchBalanceRegister(query: BalanceRegisterQuery): Promise<BalanceRegister> {
   const path = `/api/reports/party-balance?${balanceRegisterSearch(query)}`;
   return balanceRegisterSchema.parse(await getJson(path));
+}
+
+/** The stock card asked for, or why the API will not give it. */
+export async function fetchStockCard(
+  query: StockCardQuery,
+): Promise<{ card: StockCard; refusal?: never } | { card?: never; refusal: string }> {
+  const path = `/api/reports/holdings?${stockCardSearch(query)}`;
+  const response = await askApi(path);
+  // A refusal says why, in words for the person.
+  if (response.status >= 400 && response.status < 500) {
+    return { refusal: refusalSchema.parse(await response.json()).message };
+  }
+  return { card: stockCardSchema.parse(await readJson(response, path)) };
+}
+
+/** The API's own answer to a request for the card as a file, to pass on. */
+export function fetchStockCardCsv(query: StockCardQuery): Promise<Response> {
+  return askApi(`/api/reports/holdings.csv?${stockCardSearch(query)}`);
 }
 
 /** Today's date in India. */

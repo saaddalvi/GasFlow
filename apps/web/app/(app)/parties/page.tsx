@@ -3,6 +3,8 @@ import {
   billName,
   PARTY_TYPES,
   partyListQuerySchema,
+  BILL_TYPE_NAMES,
+  PARTY_TYPE_NAMES,
   type PartyListQuery,
   type PartyReport,
   type ReportedParty,
@@ -19,10 +21,8 @@ import { PageHeading } from "@/components/page-heading";
 import { EmptyPage, Pagination } from "@/components/pagination";
 import { Tag } from "@/components/tag";
 import { fetchPartyReport, orNull } from "@/lib/api";
-import { BILL_TYPE_NAMES } from "@/lib/bill-names";
 import { formatDate } from "@/lib/dates";
 import { partyListSearch } from "@/lib/party-list-search";
-import { PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { billPath, partyPath, PARTIES_PATH } from "@/lib/routes";
 import { Summary } from "./summary";
 

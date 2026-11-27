@@ -16,11 +16,11 @@ const PAGE_SIZE = 50;
  */
 export const MOVEMENTS = Prisma.sql`
   SELECT b.to_party_id AS party_id, b.date, b.type AS bill_type, l.gas_id, l.fill_state,
-         l.quantity
+         l.quantity, b.id AS bill_id, l.line_no
     FROM bills b JOIN bill_lines l ON l.bill_id = b.id
    WHERE b.status = 'posted'
    UNION ALL
-  SELECT b.from_party_id, b.date, b.type, l.gas_id, l.fill_state, -l.quantity
+  SELECT b.from_party_id, b.date, b.type, l.gas_id, l.fill_state, -l.quantity, b.id, l.line_no
     FROM bills b JOIN bill_lines l ON l.bill_id = b.id
    WHERE b.status = 'posted'
 `;

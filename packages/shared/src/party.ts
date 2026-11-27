@@ -9,6 +9,13 @@ export const partyTypeSchema = z.enum(PARTY_TYPES, "Choose customer, refiller or
 
 export type PartyType = z.infer<typeof partyTypeSchema>;
 
+/** The types of party as people read them, on the screens and in files. */
+export const PARTY_TYPE_NAMES: Record<PartyType, string> = {
+  customer: "Customer",
+  refiller: "Refiller",
+  supplier: "Supplier",
+};
+
 /** The parties whose cylinders are counted. A supplier holds none. */
 export const HOLDER_TYPES = ["shop", "customer", "refiller"] as const;
 
@@ -81,8 +88,10 @@ export const partyListQuerySchema = z.object({
   /** Part of a name, in any capitals. */
   search: text("Search for one name at a time.").optional(),
   type: optionalChoice(partyTypeSchema),
-  /** Whether to include inactive parties. Pickers leave this off. */
+  /** Whether to include inactive parties. Pickers of new entries leave this off. */
   inactive: queryFlag,
+  /** Whether to list only those whose cylinders are counted: customers and refillers. */
+  holders: queryFlag,
   page: queryPage,
 });
 

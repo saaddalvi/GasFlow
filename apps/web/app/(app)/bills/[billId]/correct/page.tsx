@@ -1,5 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
-import { billName, whyNotCorrect, whyUncorrectable, type Bill } from "@gasflow/shared";
+import {
+  billName,
+  whyNotCorrect,
+  whyUncorrectable,
+  BILL_TYPE_NAMES,
+  type Bill,
+} from "@gasflow/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -15,7 +21,6 @@ import {
   fetchVehicles,
   orNull,
 } from "@/lib/api";
-import { BILL_TYPE_NAMES } from "@/lib/bill-names";
 import { billPath } from "@/lib/routes";
 import { CorrectionForm, type Correctable } from "./correction-form";
 

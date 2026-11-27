@@ -50,3 +50,11 @@ export const DAY_LEDGER_PATH = "/reports/ledger";
 
 /** What every customer and refiller held on a day. */
 export const BALANCE_REGISTER_PATH = "/reports/party-balance";
+
+/** A statement of one customer's or refiller's cylinders over a range of dates. */
+export const STOCK_CARD_PATH = "/reports/holdings";
+
+/** The stock card of this party. */
+export function stockCardPath(partyId: string): string {
+  return `${STOCK_CARD_PATH}?${new URLSearchParams({ partyId }).toString()}`;
+}

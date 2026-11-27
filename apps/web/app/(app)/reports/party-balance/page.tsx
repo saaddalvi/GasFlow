@@ -3,6 +3,7 @@ import {
   balanceRegisterQuerySchema,
   isBelowZero,
   REGISTER_PARTY_TYPES,
+  PARTY_TYPE_NAMES,
   type BalanceRegister,
   type BalanceRegisterQuery,
   type RegisterParty,
@@ -22,7 +23,6 @@ import { Tag } from "@/components/tag";
 import { fetchBalanceRegister, orNull } from "@/lib/api";
 import { balanceRegisterSearch } from "@/lib/balance-register-search";
 import { formatDate } from "@/lib/dates";
-import { PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { BALANCE_REGISTER_PATH, partyPath } from "@/lib/routes";
 
 export const metadata: Metadata = {

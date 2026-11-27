@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
         staffName={me?.displayName}
         isAdmin={me?.isAdmin}
       />
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6 print:max-w-none print:p-0">{children}</main>
     </>
   );
 }

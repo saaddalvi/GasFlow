@@ -32,7 +32,7 @@ export function CountCell({
   const colours = count < 0 ? "bg-rose-100 text-rose-700" : count === 0 ? "text-slate-400" : "";
   return (
     <td
-      className={`px-3 py-3 ${startsGroup ? "border-l border-slate-100" : ""} ${
+      className={`px-3 py-3 print:px-1 print:py-1 ${startsGroup ? "border-l border-slate-100" : ""} ${
         bold ? "font-semibold" : ""
       } ${colours}`}
     >

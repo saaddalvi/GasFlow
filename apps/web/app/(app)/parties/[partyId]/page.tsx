@@ -1,5 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
-import { billListQuerySchema, holdsCylinders, type BillStatus, type Party } from "@gasflow/shared";
+import {
+  billListQuerySchema,
+  holdsCylinders,
+  PARTY_TYPE_NAMES,
+  type BillStatus,
+  type Party,
+} from "@gasflow/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionDialog } from "@/components/action-dialog";
@@ -21,8 +27,7 @@ import {
   type BillChoice,
   type PartyPageQuery,
 } from "@/lib/party-page-search";
-import { PARTY_TYPE_NAMES } from "@/lib/party-types";
-import { partyPath, receiveEmptiesFromPath } from "@/lib/routes";
+import { partyPath, receiveEmptiesFromPath, stockCardPath } from "@/lib/routes";
 import { UnmatchedRows } from "../../returns/unmatched/unmatched-rows";
 import { setPartyActive } from "../actions";
 import { Activity, type Shown } from "./activity";
@@ -75,6 +80,11 @@ export default async function PartyPage({
           {party.type === "customer" && party.active && (
             <Link href={receiveEmptiesFromPath(party.id)} className={buttonStyles.primary}>
               Receive empties
+            </Link>
+          )}
+          {holds && (
+            <Link href={stockCardPath(party.id)} className={buttonStyles.secondary}>
+              Stock card
             </Link>
           )}
           <Link href={`${partyPath(party.id)}/edit`} className={buttonStyles.secondary}>

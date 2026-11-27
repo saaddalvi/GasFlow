@@ -1,6 +1,7 @@
+import { WRITE_OFF_REASON_NAMES } from "@gasflow/shared";
 import type { Bill, BillParty } from "@gasflow/shared";
 import Link from "next/link";
-import { FILL_STATE_NAMES, WRITE_OFF_REASON_NAMES } from "@/lib/bill-names";
+import { FILL_STATE_NAMES } from "@/lib/bill-names";
 import { BILL_PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { vehicleName } from "@/lib/vehicle-names";
 import { partyPath } from "@/lib/routes";

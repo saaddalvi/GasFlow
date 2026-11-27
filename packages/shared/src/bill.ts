@@ -28,6 +28,17 @@ export const billTypeSchema = z.enum(
 
 export type BillType = z.infer<typeof billTypeSchema>;
 
+/** The types of bill as people read them, on the screens and in files. */
+export const BILL_TYPE_NAMES: Record<BillType, string> = {
+  opening_stock: "Opening stock",
+  dispatch: "Dispatch",
+  send_to_refiller: "Send to refiller",
+  return_from_refiller: "Return from refiller",
+  return_from_customer: "Return",
+  add_cylinders: "Add cylinders",
+  write_off: "Write-off",
+};
+
 /** Which of the agency's paper a bill was written on. */
 export const PAPER_KINDS = ["bill", "cash_memo"] as const;
 
@@ -72,6 +83,11 @@ export const WRITE_OFF_REASONS = ["scrapped", "lost"] as const;
 export const writeOffReasonSchema = z.enum(WRITE_OFF_REASONS, "Choose scrapped or lost.");
 
 export type WriteOffReason = z.infer<typeof writeOffReasonSchema>;
+
+export const WRITE_OFF_REASON_NAMES: Record<WriteOffReason, string> = {
+  scrapped: "Scrapped",
+  lost: "Lost",
+};
 
 /** A party as a bill names it, which may be the shop. */
 export const billPartySchema = z.object({

@@ -16,3 +16,4 @@ export * from "./overdue-limit";
 export * from "./holding";
 export * from "./day-ledger";
 export * from "./balance-register";
+export * from "./stock-card";

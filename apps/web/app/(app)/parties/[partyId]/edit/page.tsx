@@ -1,7 +1,7 @@
+import { PARTY_TYPE_NAMES } from "@gasflow/shared";
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import { PageHeading } from "@/components/page-heading";
-import { PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { loadParty } from "../load-party";
 import { PartyForm } from "../../party-form";
 

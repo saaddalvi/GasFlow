@@ -5,6 +5,7 @@ import {
   whyNotCancel,
   whyNotCorrect,
   whyUncorrectable,
+  BILL_TYPE_NAMES,
   type Bill,
   type Cancellation,
 } from "@gasflow/shared";
@@ -17,7 +18,7 @@ import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
 import { Tag } from "@/components/tag";
 import { fetchBill, fetchMe, fetchToday, orNull } from "@/lib/api";
-import { BILL_TYPE_NAMES, CANCEL_REASON_NAMES } from "@/lib/bill-names";
+import { CANCEL_REASON_NAMES } from "@/lib/bill-names";
 import { formatDate, formatMoment } from "@/lib/dates";
 import { BILLS_PATH, correctBillPath, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
 import { DetailList, Lines, movementDetails, Typed } from "./bill-parts";

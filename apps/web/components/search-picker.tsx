@@ -23,6 +23,8 @@ interface Matches<Option> {
 export function SearchPicker<Answer, Option extends Choice>({
   label,
   noun,
+  plural = `${noun}s`,
+  noMatch = `No active ${noun} matches.`,
   chosen,
   onChoose,
   address,
@@ -36,6 +38,10 @@ export function SearchPicker<Answer, Option extends Choice>({
   label: string;
   /** What is searched for, such as "customer". */
   noun: string;
+  /** More than one of them, if adding an "s" does not say it. */
+  plural?: string;
+  /** What is said when nothing matches, if more than the active are searched. */
+  noMatch?: string;
   chosen: Choice | null;
   /** Called with null once the chosen name is typed over. */
   onChoose: (option: Option | null) => void;
@@ -154,7 +160,7 @@ export function SearchPicker<Answer, Option extends Choice>({
                   ref={list}
                   id={listId}
                   role="listbox"
-                  aria-label={`${label}s`}
+                  aria-label={plural}
                   className="max-h-64 overflow-y-auto"
                 >
                   {found.map((option, index) => (
@@ -175,7 +181,7 @@ export function SearchPicker<Answer, Option extends Choice>({
                     </li>
                   ))}
                 </ul>
-                <Note noun={noun} answer={answer} matches={matches} />
+                <Note plural={plural} noMatch={noMatch} answer={answer} matches={matches} />
               </div>
             )}
           </div>
@@ -188,20 +194,22 @@ export function SearchPicker<Answer, Option extends Choice>({
 
 /** What the list cannot say by itself. */
 function Note({
-  noun,
+  plural,
+  noMatch,
   answer,
   matches,
 }: {
-  noun: string;
+  plural: string;
+  noMatch: string;
   answer: Lookup<unknown> | undefined;
   matches: Matches<unknown> | undefined;
 }) {
   const note = answer?.failed
-    ? `The ${noun}s could not be searched. Check your connection and type again.`
+    ? `The ${plural} could not be searched. Check your connection and type again.`
     : !matches
       ? "Searching…"
       : matches.total === 0
-        ? `No active ${noun} matches.`
+        ? noMatch
         : matches.total > matches.options.length
           ? `Showing ${matches.options.length} of ${matches.total}. Type more of the name.`
           : null;

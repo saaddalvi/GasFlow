@@ -12,6 +12,7 @@ import {
   PARTIES_PATH,
   RECEIVE_EMPTIES_PATH,
   SIGN_IN_PATH,
+  STOCK_CARD_PATH,
   STOCK_REPORT_PATH,
 } from "@/lib/routes";
 import { LogoMark } from "./logo-mark";
@@ -35,6 +36,7 @@ const REPORT_LINKS: NavLink[] = [
   { href: STOCK_REPORT_PATH, label: "Stock" },
   { href: DAY_LEDGER_PATH, label: "Day ledger" },
   { href: BALANCE_REGISTER_PATH, label: "Balance register" },
+  { href: STOCK_CARD_PATH, label: "Stock card" },
 ];
 
 export function NavBar({
@@ -47,7 +49,7 @@ export function NavBar({
   isAdmin?: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white print:hidden">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
         <Link href="/" className="flex min-w-0 items-center gap-2">
           <LogoMark />

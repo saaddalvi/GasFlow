@@ -11,6 +11,12 @@ export function indianDate(moment: Date): string {
   return new Date(moment.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
+/** The first day of the financial year the date is in, which begins on 1 April. */
+export function financialYearStart(date: string): string {
+  const year = Number(date.slice(0, 4));
+  return `${date.slice(5, 7) >= "04" ? year : year - 1}-04-01`;
+}
+
 export const todaySchema = z.object({
   date: dateSchema,
 });
