@@ -63,6 +63,9 @@ export const BALANCE_REGISTER_PATH = "/reports/party-balance";
 /** A statement of one customer's or refiller's cylinders over a range of dates. */
 export const STOCK_CARD_PATH = "/reports/holdings";
 
+/** Where the offline backup is downloaded from. It gives a file, not a page. */
+export const BACKUP_PATH = "/backup";
+
 /** The stock card of this party. */
 export function stockCardPath(partyId: string): string {
   return `${STOCK_CARD_PATH}?${new URLSearchParams({ partyId }).toString()}`;

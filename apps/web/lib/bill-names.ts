@@ -4,30 +4,7 @@ import {
   WRITE_OFF_REASON_NAMES,
   type Bill,
   type BillLine,
-  type BillStatus,
-  type CancelReason,
-  type FillState,
 } from "@gasflow/shared";
-
-export const FILL_STATE_NAMES: Record<FillState, string> = {
-  filled: "Filled",
-  empty: "Empty",
-  defective: "Defective",
-};
-
-export const BILL_STATUS_NAMES: Record<BillStatus, string> = {
-  posted: "Posted",
-  cancelled: "Cancelled",
-};
-
-export const CANCEL_REASON_NAMES: Record<CancelReason, string> = {
-  data_entry_error: "Data entry error",
-  duplicate_entry: "Duplicate entry",
-  customer_rejected: "Customer rejected",
-  wrong_cylinder_loaded: "Wrong cylinder loaded",
-  bill_voided: "Bill voided",
-  other: "Other",
-};
 
 /**
  * What sort of bill it is, with its paper kind or reason if it has one, such as

@@ -21,6 +21,30 @@ export function firstOfMonth(date: string): string {
   return `${date.slice(0, 7)}-01`;
 }
 
+const DAY = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+const MOMENT = new Intl.DateTimeFormat("en-IN", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "Asia/Kolkata",
+});
+
+/** A date for people to read, such as "26 Nov 2026". */
+export function formatDate(date: string): string {
+  // Read and written as UTC, so that no time zone can move it.
+  return DAY.format(new Date(date));
+}
+
+/** A moment for people to read, in Indian Standard Time. */
+export function formatMoment(moment: string): string {
+  return MOMENT.format(new Date(moment));
+}
+
 /** The date this many days later, or earlier if the number is negative. */
 export function addDays(date: string, days: number): string {
   const moved = new Date(date);

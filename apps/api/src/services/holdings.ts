@@ -66,6 +66,27 @@ export function findHoldings(
 }
 
 /**
+ * These customers and refillers, each with what it held, gas by gas and all
+ * together, as findHoldings counts it.
+ */
+export async function withHoldings<Party extends { id: string }>(
+  db: Database | Transaction,
+  parties: Party[],
+  date?: string,
+) {
+  const holdings = await findHoldings(
+    db,
+    parties.map((party) => party.id),
+    date,
+  );
+  const held = new Map<string, Holding[]>(parties.map((party) => [party.id, []]));
+  // Only these parties were asked about.
+  for (const holding of holdings) held.get(holding.partyId)!.push(holding);
+  // Each party was given a list above.
+  return parties.map((party) => ({ ...party, ...heldBy(held.get(party.id)!) }));
+}
+
+/**
  * How many customers, and how many refillers, held some of any gas, or fewer than
  * none, at the end of the day, and how many counts of theirs, one for each party
  * and gas, were below zero.

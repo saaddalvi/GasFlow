@@ -1,10 +1,12 @@
 "use client";
 
 import { SignOutButton } from "@clerk/nextjs";
+import { BACKUP_DAYS_OF_BILLS } from "@gasflow/shared";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef } from "react";
 import {
+  BACKUP_PATH,
   BALANCE_REGISTER_PATH,
   BILLS_PATH,
   DASHBOARD_PATH,
@@ -181,9 +183,9 @@ function Chevron() {
   );
 }
 
-/** Sign out, behind the staff member's name, on a wider screen. */
+/** The backup and sign out, behind the staff member's name, on a wider screen. */
 function AccountMenu({ staffName }: { staffName?: string }) {
-  const { ref } = useMenu();
+  const { ref, closeOnLink } = useMenu();
 
   return (
     <details ref={ref} className="relative ml-auto hidden lg:block">
@@ -191,14 +193,18 @@ function AccountMenu({ staffName }: { staffName?: string }) {
         <span className="max-w-48 truncate">{staffName ?? "Account"}</span>
         <Chevron />
       </summary>
-      <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+      <div
+        className="absolute right-0 top-full mt-2 w-64 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+        onClick={closeOnLink}
+      >
+        <BackupDownload />
         <SignOut />
       </div>
     </details>
   );
 }
 
-/** The whole navigation, including sign out, behind one button on a narrower screen. */
+/** The whole navigation, the backup and sign out, behind one button on a narrower screen. */
 function CollapsedMenu({ staffName, isAdmin }: { staffName?: string; isAdmin: boolean }) {
   const { ref, closeOnLink } = useMenu();
 
@@ -217,14 +223,33 @@ function CollapsedMenu({ staffName, isAdmin }: { staffName?: string; isAdmin: bo
         <nav aria-label="Main" className="flex flex-col gap-3" onClick={closeOnLink}>
           <ListOfLinks isAdmin={isAdmin} />
         </nav>
-        <div className="mt-3 border-t border-slate-100 pt-3">
+        <div className="mt-3 border-t border-slate-100 pt-3" onClick={closeOnLink}>
           {staffName && (
             <p className="mb-1 px-3 text-sm text-slate-500">Signed in as {staffName}</p>
           )}
+          <BackupDownload />
           <SignOut />
         </div>
       </div>
     </details>
+  );
+}
+
+/** Downloads the file staff keep for looking things up with no internet. */
+function BackupDownload() {
+  return (
+    // A plain link, so that nothing fetches the file before it is asked for.
+    <a
+      href={BACKUP_PATH}
+      download
+      className="block rounded-md px-3 py-3 text-sm text-slate-600 hover:bg-slate-100"
+    >
+      Offline backup
+      <span className="block text-xs text-slate-500">
+        One file with every party’s holdings and the last {BACKUP_DAYS_OF_BILLS} days of bills.
+        Opens with no internet.
+      </span>
+    </a>
   );
 }
 

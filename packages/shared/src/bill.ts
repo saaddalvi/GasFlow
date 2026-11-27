@@ -39,6 +39,12 @@ export const BILL_TYPE_NAMES: Record<BillType, string> = {
   write_off: "Write-off",
 };
 
+export const FILL_STATE_NAMES: Record<FillState, string> = {
+  filled: "Filled",
+  empty: "Empty",
+  defective: "Defective",
+};
+
 /** Which of the agency's paper a bill was written on. */
 export const PAPER_KINDS = ["bill", "cash_memo"] as const;
 
@@ -177,6 +183,11 @@ export const billStatusSchema = z.enum(["posted", "cancelled"], "Choose posted o
 
 export type BillStatus = z.infer<typeof billStatusSchema>;
 
+export const BILL_STATUS_NAMES: Record<BillStatus, string> = {
+  posted: "Posted",
+  cancelled: "Cancelled",
+};
+
 export const CANCEL_REASONS = [
   "data_entry_error",
   "duplicate_entry",
@@ -189,6 +200,15 @@ export const CANCEL_REASONS = [
 export const cancelReasonSchema = z.enum(CANCEL_REASONS, "Choose why the bill is cancelled.");
 
 export type CancelReason = z.infer<typeof cancelReasonSchema>;
+
+export const CANCEL_REASON_NAMES: Record<CancelReason, string> = {
+  data_entry_error: "Data entry error",
+  duplicate_entry: "Duplicate entry",
+  customer_rejected: "Customer rejected",
+  wrong_cylinder_loaded: "Wrong cylinder loaded",
+  bill_voided: "Bill voided",
+  other: "Other",
+};
 
 /** A cancellation as it is asked for. Which bill it is said beside this. */
 export const newCancellationSchema = z.object({

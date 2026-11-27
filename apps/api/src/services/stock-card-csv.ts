@@ -6,18 +6,20 @@ import {
   PARTY_TYPE_NAMES,
   pendingBillName,
   WRITE_OFF_REASON_NAMES,
+  type Shop,
   type StockCard,
   type StockCardBill,
   type StockCardFigures,
   type StockCardLine,
 } from "@gasflow/shared";
+import { fileName, type DownloadedFile } from "./downloaded-file";
 
 /** A stock card as a file for a spreadsheet, with what the card on screen shows. */
-export function stockCardCsv(shopName: string, card: StockCard): { name: string; text: string } {
+export function stockCardCsv(shop: Pick<Shop, "name">, card: StockCard): DownloadedFile {
   const { party, from, to } = card;
   const headings = CARD_FIGURE_NAMES[party.type];
   const rows: Cell[][] = [
-    ["Shop", shopName],
+    ["Shop", shop.name],
     ["Stock card", party.name],
     ["Type", PARTY_TYPE_NAMES[party.type]],
     ["From", from],
@@ -46,7 +48,8 @@ export function stockCardCsv(shopName: string, card: StockCard): { name: string;
     ...card.closing.map((figures) => figuresRow("Closing", to, figures)),
   ];
   return {
-    name: fileName(card),
+    // Such as "stock-card-city-hospital-2026-11-01-to-2026-11-26.csv".
+    name: fileName(["stock-card", party.name, from, "to", to], "csv"),
     // The mark at the start tells a spreadsheet that the text is UTF-8.
     text: `\uFEFF${rows.map((row) => `${row.map(cell).join(",")}\r\n`).join("")}`,
   };
@@ -102,13 +105,4 @@ function cell(value: Cell): string {
   // apostrophe stops.
   const text = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
-/** Such as "stock-card-city-hospital-2026-11-01-to-2026-11-26.csv". */
-function fileName({ party, from, to }: StockCard): string {
-  const name = party.name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  return `${["stock-card", name, from, "to", to].filter(Boolean).join("-")}.csv`;
 }

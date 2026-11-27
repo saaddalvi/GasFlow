@@ -1,9 +1,9 @@
 import type { Gas, GasChanges, GasListQuery, NewGas } from "@gasflow/shared";
-import { isRepeat, type Database } from "../database";
+import { isRepeat, type Database, type Transaction } from "../database";
 import { Refusal } from "../refusal";
 
 /** Gases in the order they were added, the starting ones first. */
-export function listGases(db: Database, { retired }: GasListQuery): Promise<Gas[]> {
+export function listGases(db: Database | Transaction, { retired }: GasListQuery): Promise<Gas[]> {
   return db.gas.findMany({
     where: { active: retired ? undefined : true },
     select: GAS,

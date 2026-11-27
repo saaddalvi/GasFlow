@@ -158,6 +158,9 @@ In the API:
 - A write-off from the shop or a refiller is a bill like the others. One from a
   customer clears pending on a bill, so it is entered at
   `/api/customer-write-offs`, is matched as a return is, and is never corrected.
+- The offline backup, `GET /api/backup`, is one HTML page that needs nothing
+  else. Write it with the `html` tag in `src/services/html.ts`, which shows
+  anything put into it as text, never as markup.
 - Reports only read. They work every figure out from posted bills, and no stock
   count is stored. Pending cylinders are likewise worked out, by
   `src/services/pending.ts`, from the allocations of posted returns and

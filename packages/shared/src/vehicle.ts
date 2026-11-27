@@ -12,6 +12,11 @@ export const vehicleSchema = z.object({
 
 export type Vehicle = z.infer<typeof vehicleSchema>;
 
+/** A vehicle by its plate, with its label if it has one. */
+export function vehicleName({ plate, label }: Pick<Vehicle, "plate" | "label">): string {
+  return label ? `${plate} (${label})` : plate;
+}
+
 /** What can be filled in about a vehicle. */
 const vehicleFields = {
   plate: requiredText({

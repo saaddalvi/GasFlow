@@ -8,6 +8,7 @@ import {
   BILL_TYPE_NAMES,
   type BillList,
   type BillListQuery,
+  BILL_STATUS_NAMES,
 } from "@gasflow/shared";
 import type { Metadata } from "next";
 import Form from "next/form";
@@ -20,7 +21,6 @@ import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyPage, Pagination } from "@/components/pagination";
 import { fetchBills, orNull } from "@/lib/api";
-import { BILL_STATUS_NAMES } from "@/lib/bill-names";
 import { billListSearch } from "@/lib/bill-list-search";
 import { BILLS_PATH, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
 

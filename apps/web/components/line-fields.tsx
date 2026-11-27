@@ -1,7 +1,12 @@
 "use client";
 
-import { FILL_STATES, type BillLine, type FillState, type Gas } from "@gasflow/shared";
-import { FILL_STATE_NAMES } from "@/lib/bill-names";
+import {
+  FILL_STATES,
+  type BillLine,
+  type FillState,
+  type Gas,
+  FILL_STATE_NAMES,
+} from "@gasflow/shared";
 import { buttonStyles } from "./button-styles";
 import { Field, SelectField } from "./fields";
 

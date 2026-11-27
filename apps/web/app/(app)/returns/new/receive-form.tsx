@@ -12,6 +12,7 @@ import {
   type Gas,
   type PendingList,
   type ReceivedReturn,
+  FILL_STATE_NAMES,
 } from "@gasflow/shared";
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState, useTransition } from "react";
@@ -25,7 +26,6 @@ import { LoadError } from "@/components/load-error";
 import { LoadState } from "@/components/load-state";
 import type { Choice } from "@/components/search-picker";
 import type { Outcome } from "@/lib/api";
-import { FILL_STATE_NAMES } from "@/lib/bill-names";
 import { holdEnter } from "@/lib/hold-enter";
 import { billPath, RECEIVE_EMPTIES_PATH, UNMATCHED_RETURNS_PATH } from "@/lib/routes";
 import { useLastGiven } from "@/lib/use-last-given";

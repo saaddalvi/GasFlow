@@ -1,12 +1,16 @@
 import { auth } from "@clerk/nextjs/server";
-import { dayLedgerQuerySchema, type DayLedger, type DayLedgerTable } from "@gasflow/shared";
+import {
+  dayLedgerQuerySchema,
+  type DayLedger,
+  type DayLedgerTable,
+  FILL_STATE_NAMES,
+} from "@gasflow/shared";
 import type { Metadata } from "next";
 import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
 import { NoRecords, ReportDayPicker } from "@/components/report-day";
 import { CountCell, ReportTable, ROW_HEADING_CELL } from "@/components/report-table";
 import { fetchDayLedger, orNull } from "@/lib/api";
-import { FILL_STATE_NAMES } from "@/lib/bill-names";
 import { formatDateInFull } from "@/lib/dates";
 import { DAY_LEDGER_PATH } from "@/lib/routes";
 

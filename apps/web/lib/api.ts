@@ -257,6 +257,11 @@ export function fetchStockCardCsv(query: StockCardQuery): Promise<Response> {
   return askApi(`/api/reports/holdings.csv?${stockCardSearch(query)}`);
 }
 
+/** The API's own answer to a request for the offline backup, to pass on. */
+export function fetchBackup(): Promise<Response> {
+  return askApi("/api/backup");
+}
+
 /** Today's date in India. */
 export async function fetchToday(): Promise<string> {
   return todaySchema.parse(await getJson("/api/today")).date;

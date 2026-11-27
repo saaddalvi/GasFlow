@@ -7,7 +7,7 @@ import {
 } from "@gasflow/shared";
 import { today, type Clock } from "../clock";
 import { containing, type Database } from "../database";
-import { findHoldings, heldBy, type Holding } from "./holdings";
+import { withHoldings } from "./holdings";
 import { getStartDate } from "./setup";
 
 const PAGE_SIZE = 50;
@@ -69,19 +69,7 @@ async function findRegisterParties(
     // The id keeps parties of one name in the same order on every page.
     orderBy: [{ name: "asc" }, { id: "asc" }],
   });
-  const holdings = await findHoldings(
-    db,
-    parties.map((party) => party.id),
-    date,
-  );
-  const held = new Map<string, Holding[]>(parties.map((party) => [party.id, []]));
-  // Only these parties were asked about.
-  for (const holding of holdings) held.get(holding.partyId)!.push(holding);
-  return parties.map((party) => ({
-    ...party,
-    // The query gives only these types.
-    type: party.type as RegisterParty["type"],
-    // Each party was given a list above.
-    ...heldBy(held.get(party.id)!),
-  }));
+  const held = await withHoldings(db, parties, date);
+  // The query gives only these types.
+  return held.map((party) => ({ ...party, type: party.type as RegisterParty["type"] }));
 }

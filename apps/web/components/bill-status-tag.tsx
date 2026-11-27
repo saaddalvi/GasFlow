@@ -1,5 +1,4 @@
-import type { Bill } from "@gasflow/shared";
-import { BILL_STATUS_NAMES } from "@/lib/bill-names";
+import { BILL_STATUS_NAMES, type Bill } from "@gasflow/shared";
 import { Tag } from "./tag";
 
 /** Whether a bill counts. */

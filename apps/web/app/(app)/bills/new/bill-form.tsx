@@ -16,6 +16,8 @@ import {
   type PaperKind,
   type PartyType,
   type Vehicle,
+  FILL_STATE_NAMES,
+  vehicleName,
 } from "@gasflow/shared";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -34,11 +36,9 @@ import {
 } from "@/components/line-fields";
 import { LoadError } from "@/components/load-error";
 import type { Outcome } from "@/lib/api";
-import { FILL_STATE_NAMES } from "@/lib/bill-names";
 import { holdEnter } from "@/lib/hold-enter";
 import { billPath, BILLS_PATH } from "@/lib/routes";
 import { useLastGiven } from "@/lib/use-last-given";
-import { vehicleName } from "@/lib/vehicle-names";
 import { CustomerPicker } from "../../returns/new/customer-picker";
 import { correctBill } from "../actions";
 import { saveBill, saveCustomerWriteOff } from "./actions";

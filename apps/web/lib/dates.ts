@@ -1,14 +1,9 @@
 import { addDays, firstOfMonth } from "@gasflow/shared";
 
+export { formatDate, formatMoment } from "@gasflow/shared";
+
 // Dates from the API are text such as "2026-11-26", with no time of day. They
 // are read and written as UTC here, so that no time zone can move them.
-
-const DAY = new Intl.DateTimeFormat("en-IN", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
 
 const DAY_IN_FULL = new Intl.DateTimeFormat("en-IN", {
   weekday: "long",
@@ -35,17 +30,6 @@ const WEEKDAY = new Intl.DateTimeFormat("en-IN", { weekday: "long", timeZone: "U
 const SHORT_WEEKDAY = new Intl.DateTimeFormat("en-IN", { weekday: "short", timeZone: "UTC" });
 
 const TIME = new Intl.DateTimeFormat("en-IN", { timeStyle: "short", timeZone: "Asia/Kolkata" });
-
-const MOMENT = new Intl.DateTimeFormat("en-IN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Asia/Kolkata",
-});
-
-/** A date for people to read, such as "26 Nov 2026". */
-export function formatDate(date: string): string {
-  return DAY.format(new Date(date));
-}
 
 /** A date with its weekday, to check against paper, such as "Thursday, 26 November 2026". */
 export function formatDateInFull(date: string): string {
@@ -75,11 +59,6 @@ export function formatShortWeekday(date: string): string {
 /** The time of day of a moment, in Indian Standard Time. */
 export function formatTime(moment: string): string {
   return TIME.format(new Date(moment));
-}
-
-/** A moment for people to read, in Indian Standard Time. */
-export function formatMoment(moment: string): string {
-  return MOMENT.format(new Date(moment));
 }
 
 /**

@@ -18,3 +18,4 @@ export * from "./day-ledger";
 export * from "./balance-register";
 export * from "./stock-card";
 export * from "./dashboard";
+export * from "./backup";

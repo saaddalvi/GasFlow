@@ -5,12 +5,12 @@ import {
   checkInput,
   newCancellationSchema,
   type NewCancellation,
+  CANCEL_REASON_NAMES,
 } from "@gasflow/shared";
 import { useRef, useState } from "react";
 import { ActionDialog, type ActionDialogHandle } from "@/components/action-dialog";
 import { buttonStyles } from "@/components/button-styles";
 import { SelectField, TextAreaField } from "@/components/fields";
-import { CANCEL_REASON_NAMES } from "@/lib/bill-names";
 import { cancelBill } from "../actions";
 
 /** Asks why a bill is to be cancelled, confirms it, and cancels it. */
