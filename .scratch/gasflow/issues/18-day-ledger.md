@@ -16,7 +16,7 @@
 
 ## Comments
 
-**27 November 2026: built in commit `574cf74`, waiting on a check by hand.** Not pushed, so CI has not run on it.
+**27 November 2026: built in commit `574cf74`, waiting on a check by hand.** Pushed since, as recorded at the end.
 
 Still to do, signed in with real accounts. No migration is new.
 
@@ -52,3 +52,8 @@ For later tickets:
 
 - Tickets 19 and 20: `MOVEMENTS` in `services/holdings.ts` now has each movement's `bill_type`, to keep opening stock out of activity. A Reports dropdown would make room in the menu.
 - Ticket 21: `reportDayLedger` gives the shop's In and Out for a day by fill state, which covers more bill types than the dashboard's dispatches and returns.
+
+**27 November 2026: pushed.**
+
+- Pushed up to `ecf9785`, and CI passed on it, as the project owner reported.
+- The checks under "Still to do" are not recorded as done.
