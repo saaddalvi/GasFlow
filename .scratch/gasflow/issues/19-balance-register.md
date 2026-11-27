@@ -6,13 +6,13 @@
 
 **Status:** ready-for-agent
 
-- [ ] For a chosen date, each customer and refiller is listed with type, a gas breakdown and the total held
-- [ ] Rows expand to the full breakdown by gas
-- [ ] The list filters by party type, non-zero or all, and name
-- [ ] A header states how many parties, how many cylinders held and how many are below zero
-- [ ] Negative holdings are flagged
-- [ ] The shop and suppliers are not listed as holders
-- [ ] Figures match the Stock report for the same date
+- [x] For a chosen date, each customer and refiller is listed with type, a gas breakdown and the total held
+- [x] Rows expand to the full breakdown by gas
+- [x] The list filters by party type, non-zero or all, and name
+- [x] A header states how many parties, how many cylinders held and how many are below zero
+- [x] Negative holdings are flagged
+- [x] The shop and suppliers are not listed as holders
+- [x] Figures match the Stock report for the same date
 
 ## Comments
 
@@ -61,3 +61,9 @@ For later tickets:
 
 - Pushed up to `b1370d5`, and CI passed on it, as the project owner reported.
 - The checks under "Still to do" are not recorded as done.
+
+**27 November 2026: completed** in commit `48d1dd1`.
+
+- The project owner asked for the ticket to be marked complete. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
+- The code committed in `48d1dd1` has not changed since.
+- The decisions listed for the project owner are not recorded as settled.
