@@ -278,6 +278,8 @@ export const billListQuerySchema = z.object({
   /** The first and last dates of the bills wanted. */
   from: queryDate,
   to: queryDate,
+  /** Narrows the list to the bills entered on this date in India, whatever their own dates. */
+  enteredOn: queryDate,
   /** Narrows the list to the bills that count, or to those cancelled. */
   status: optionalChoice(billStatusSchema),
   /** Whether to list only the dispatch bills with cylinders pending. */

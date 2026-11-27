@@ -5,7 +5,7 @@ import { ActionDialog } from "@/components/action-dialog";
 import { ActionForm } from "@/components/action-form";
 import { Field } from "@/components/fields";
 import type { Outcome } from "@/lib/api";
-import { addGas, changeGas } from "./gas-actions";
+import { addGas, changeGas } from "./actions";
 
 export function AddGasForm() {
   async function submit(form: FormData): Promise<Outcome> {

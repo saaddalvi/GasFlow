@@ -1,6 +1,15 @@
 /** The one page open to someone who is not signed in. */
 export const SIGN_IN_PATH = "/sign-in";
 
+/** Today's activity and where the cylinders are: the first screen. */
+export const DASHBOARD_PATH = "/";
+
+/** The gases cylinders are counted by. */
+export const GASES_PATH = "/gases";
+
+/** Vehicles that carry cylinders. */
+export const VEHICLES_PATH = "/vehicles";
+
 /** Every bill, a page at a time. */
 export const BILLS_PATH = "/bills";
 

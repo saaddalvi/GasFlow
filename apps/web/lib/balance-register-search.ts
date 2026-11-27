@@ -11,7 +11,7 @@ export function balanceRegisterSearch({
   const query = new URLSearchParams();
   if (date) query.set("date", date);
   if (type) query.set("type", type);
-  if (show === "all") query.set("show", show);
+  if (show !== "non_zero") query.set("show", show);
   if (search) query.set("search", search);
   if (page > 1) query.set("page", String(page));
   return query.toString();

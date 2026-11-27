@@ -1,3 +1,5 @@
+import { addDays, firstOfMonth } from "@gasflow/shared";
+
 // Dates from the API are text such as "2026-11-26", with no time of day. They
 // are read and written as UTC here, so that no time zone can move them.
 
@@ -22,6 +24,18 @@ const MONTH = new Intl.DateTimeFormat("en-IN", {
   timeZone: "UTC",
 });
 
+const SHORT_DAY = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+
+const WEEKDAY = new Intl.DateTimeFormat("en-IN", { weekday: "long", timeZone: "UTC" });
+
+const SHORT_WEEKDAY = new Intl.DateTimeFormat("en-IN", { weekday: "short", timeZone: "UTC" });
+
+const TIME = new Intl.DateTimeFormat("en-IN", { timeStyle: "short", timeZone: "Asia/Kolkata" });
+
 const MOMENT = new Intl.DateTimeFormat("en-IN", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -43,16 +57,29 @@ export function formatMonth(date: string): string {
   return MONTH.format(new Date(date));
 }
 
+/** A date whose year goes without saying, such as "26 Nov". */
+export function formatDayAndMonth(date: string): string {
+  return SHORT_DAY.format(new Date(date));
+}
+
+/** The weekday of a date, such as "Thursday". */
+export function formatWeekday(date: string): string {
+  return WEEKDAY.format(new Date(date));
+}
+
+/** The weekday of a date where there is little room, such as "Thu". */
+export function formatShortWeekday(date: string): string {
+  return SHORT_WEEKDAY.format(new Date(date));
+}
+
+/** The time of day of a moment, in Indian Standard Time. */
+export function formatTime(moment: string): string {
+  return TIME.format(new Date(moment));
+}
+
 /** A moment for people to read, in Indian Standard Time. */
 export function formatMoment(moment: string): string {
   return MOMENT.format(new Date(moment));
-}
-
-/** The date this many days later, or earlier if the number is negative. */
-export function addDays(date: string, days: number): string {
-  const moved = new Date(date);
-  moved.setUTCDate(moved.getUTCDate() + days);
-  return moved.toISOString().slice(0, 10);
 }
 
 /**
@@ -62,10 +89,10 @@ export function addDays(date: string, days: number): string {
 export function monthEnds(earliest: string, today: string, most: number): string[] {
   const ends: string[] = [];
   // The day before the first of a month ends the month before it.
-  let end = addDays(`${today.slice(0, 7)}-01`, -1);
+  let end = addDays(firstOfMonth(today), -1);
   while (end >= earliest && ends.length < most) {
     ends.push(end);
-    end = addDays(`${end.slice(0, 7)}-01`, -1);
+    end = addDays(firstOfMonth(end), -1);
   }
   return ends;
 }

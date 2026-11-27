@@ -1,6 +1,7 @@
 import { SignIn } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { LogoMark } from "@/components/logo-mark";
+import { DASHBOARD_PATH } from "@/lib/routes";
 
 export const metadata: Metadata = {
   title: "Sign in · GasFlow",
@@ -19,7 +20,7 @@ export default function SignInPage() {
       <div className="flex flex-col items-center justify-center gap-6 bg-white px-4 py-10">
         {/* Clerk's card below shows the name. */}
         <LogoMark />
-        <SignIn withSignUp={false} fallbackRedirectUrl="/" />
+        <SignIn withSignUp={false} fallbackRedirectUrl={DASHBOARD_PATH} />
       </div>
     </main>
   );

@@ -6,6 +6,7 @@ import {
   billSchema,
   closedRowListSchema,
   dailySummarySchema,
+  dashboardSchema,
   dayLedgerSchema,
   splitSchema,
   gasListSchema,
@@ -41,6 +42,7 @@ import {
   type ClosedRowListQuery,
   type DailySummary,
   type DailySummaryQuery,
+  type Dashboard,
   type DayLedger,
   type DayLedgerQuery,
   type Split,
@@ -82,6 +84,11 @@ import { stockCardSearch } from "./stock-card-search";
 
 // Everything here runs on the web server, never in the browser, and asks the API
 // on behalf of the signed-in staff member.
+
+/** Today's activity and where the cylinders are. */
+export async function fetchDashboard(): Promise<Dashboard> {
+  return dashboardSchema.parse(await getJson("/api/dashboard"));
+}
 
 /** The gases in use, and the retired ones too if asked for. */
 export async function fetchGases({ retired = false } = {}): Promise<GasList> {

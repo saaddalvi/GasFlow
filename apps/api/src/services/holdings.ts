@@ -1,4 +1,11 @@
-import type { DailySummary, DailySummaryQuery, PartyHolding, PartySummary } from "@gasflow/shared";
+import {
+  firstOfMonth,
+  type DailySummary,
+  type DailySummaryQuery,
+  type PartyHolding,
+  type PartySummary,
+  type RegisterParty,
+} from "@gasflow/shared";
 import { today, type Clock } from "../clock";
 import type { Database, Transaction } from "../database";
 import { fromDatabaseDate } from "../database-date";
@@ -58,6 +65,41 @@ export function findHoldings(
   `;
 }
 
+/**
+ * How many customers, and how many refillers, held some of any gas, or fewer than
+ * none, at the end of the day, and how many counts of theirs, one for each party
+ * and gas, were below zero.
+ */
+export async function countOutsideShop(
+  db: Database,
+  date: string,
+): Promise<Record<RegisterParty["type"], { parties: number }> & { belowZero: number }> {
+  const rows = await db.$queryRaw<
+    { type: RegisterParty["type"]; parties: number; belowZero: number }[]
+  >`
+    WITH held AS (
+      SELECT p.id AS party_id, p.type, SUM(m.quantity) AS quantity
+        FROM (${MOVEMENTS}) m
+        JOIN parties p ON p.id = m.party_id AND p.type IN ('customer', 'refiller')
+       WHERE m.date <= ${date}::date
+       GROUP BY p.id, m.gas_id
+      HAVING SUM(m.quantity) <> 0
+    )
+    SELECT type::text AS type, COUNT(DISTINCT party_id)::int AS parties,
+           COUNT(*) FILTER (WHERE quantity < 0)::int AS "belowZero"
+      FROM held
+     GROUP BY type
+  `;
+  const of = (type: RegisterParty["type"]) => ({
+    parties: rows.find((row) => row.type === type)?.parties ?? 0,
+  });
+  return {
+    customer: of("customer"),
+    refiller: of("refiller"),
+    belowZero: rows.reduce((total, row) => total + row.belowZero, 0),
+  };
+}
+
 /** What the party holds now, and what has been sent to it and returned this month. */
 export async function getPartyHolding(
   db: Database,
@@ -72,8 +114,8 @@ export async function getPartyHolding(
   return { ...heldBy(held), thisMonth: { ...month, ...movement } };
 }
 
-/** One party's holdings, as they are reported: gas by gas, and all together. */
-export function heldBy(holdings: Holding[]) {
+/** Counts of one gas each, as they are reported: gas by gas, and all together. */
+export function heldBy(holdings: Pick<Holding, "gasId" | "gasName" | "quantity">[]) {
   return {
     gases: holdings.map(({ gasId, gasName, quantity }) => ({
       gas: { id: gasId, name: gasName },
@@ -88,7 +130,7 @@ function monthOf(date: string): { from: string; to: string } {
   const [year, month] = date.split("-").map(Number) as [number, number];
   // Day 0 of the month after is this month's last.
   const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  return { from: `${date.slice(0, 7)}-01`, to: `${date.slice(0, 7)}-${last}` };
+  return { from: firstOfMonth(date), to: `${date.slice(0, 7)}-${last}` };
 }
 
 // The types of bill that send cylinders to a party, and that bring them back.

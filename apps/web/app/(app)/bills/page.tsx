@@ -111,6 +111,12 @@ function Filters({ query }: { query: BillListQuery }) {
         </SelectField>
         <DateFilter label="From date" name="from" defaultValue={query.from} />
         <DateFilter label="To date" name="to" defaultValue={query.to} />
+        <DateFilter
+          label="Entered on"
+          name="enteredOn"
+          defaultValue={query.enteredOn}
+          hint="The day it was entered, whatever its date."
+        />
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <CheckboxField
@@ -133,7 +139,7 @@ function Filters({ query }: { query: BillListQuery }) {
 }
 
 /** One end of a range of dates. The bounds keep out a year that cannot be searched. */
-function DateFilter(props: { label: string; name: string; defaultValue?: string }) {
+function DateFilter(props: { label: string; name: string; defaultValue?: string; hint?: string }) {
   return <Field {...props} type="date" min="0001-01-01" max="9999-12-31" />;
 }
 

@@ -12,6 +12,14 @@ import { getStartDate } from "./setup";
 
 const PAGE_SIZE = 50;
 
+/** Which parties each choice of what to show lists. */
+const SHOWN: Record<BalanceRegisterQuery["show"], (party: RegisterParty) => boolean> = {
+  // A party with a gas above zero and another below may total nothing.
+  non_zero: (party) => party.gases.length > 0,
+  below_zero: isBelowZero,
+  all: () => true,
+};
+
 /**
  * What each customer and refiller held at the end of a day, worked out from the
  * posted bills. No count is stored anywhere.
@@ -26,10 +34,7 @@ export async function reportBalanceRegister(
   // There are no records of a day before the start date.
   const listed =
     startDate && date >= startDate
-      ? (await findRegisterParties(db, date, query)).filter(
-          // A party with a gas above zero and another below may total nothing.
-          (party) => show === "all" || party.gases.length > 0,
-        )
+      ? (await findRegisterParties(db, date, query)).filter(SHOWN[show])
       : [];
   return {
     date,

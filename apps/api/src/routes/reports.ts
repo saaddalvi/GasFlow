@@ -1,6 +1,7 @@
 import {
   balanceRegisterQuerySchema,
   balanceRegisterSchema,
+  dashboardSchema,
   dayLedgerQuerySchema,
   dayLedgerSchema,
   partyListQuerySchema,
@@ -16,6 +17,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { AppDependencies } from "../app";
 import { parseRequest } from "../refusal";
 import { reportBalanceRegister } from "../services/balance-register";
+import { reportDashboard } from "../services/dashboard";
 import { reportDayLedger } from "../services/day-ledger";
 import { reportParties } from "../services/party-report";
 import { listPendingReturns } from "../services/pending";
@@ -26,6 +28,8 @@ import { reportStock } from "../services/stock-report";
 
 /** Reports only read, and every staff member may see them. */
 export function reportRoutes(app: FastifyInstance, { db, clock }: AppDependencies): void {
+  app.get("/api/dashboard", async () => dashboardSchema.parse(await reportDashboard(db, clock)));
+
   app.get("/api/reports/party-balance", async (request) => {
     const query = parseRequest(balanceRegisterQuerySchema, request.query);
     return balanceRegisterSchema.parse(await reportBalanceRegister(db, clock, query));

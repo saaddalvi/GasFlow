@@ -236,8 +236,8 @@ test("staff narrow the list to a range of dates, which includes both ends", asyn
   expect(await numbers("from=2026-11-12&to=2026-11-10")).toEqual([]);
 });
 
-test.each(["from=yesterday", "to=2026-02-30", "from=0000-01-01"])(
-  "a date range such as %s is refused",
+test.each(["from=yesterday", "to=2026-02-30", "from=0000-01-01", "enteredOn=today"])(
+  "a date such as %s is refused",
   async (query) => {
     const { get } = await startAgency();
 
@@ -247,6 +247,26 @@ test.each(["from=yesterday", "to=2026-02-30", "from=0000-01-01"])(
     expect(response.json()).toMatchObject({ message: "Choose a date." });
   },
 );
+
+test("the entry date filter lists what was entered that day in India, whatever its date", async () => {
+  const { clock, addParty, dispatch, bills } = await startAgency();
+  const { id } = await addParty("customer", "City Hospital");
+  /** Enters a bill with this number at the instant. */
+  const enteredAt = async (instant: string, number: string, date: string) => {
+    clock.set(instant);
+    await dispatch(id, { number, date });
+  };
+  // The last moment of the 25th in India, and the first and last of the 26th.
+  await enteredAt("2026-11-25T18:29:59.999Z", "before", "2026-11-26");
+  await enteredAt("2026-11-25T18:30:00.000Z", "first", "2026-11-02");
+  await enteredAt("2026-11-26T18:29:59.999Z", "last", "2026-11-26");
+  await enteredAt("2026-11-26T18:30:00.000Z", "after", "2026-11-26");
+  const numbers = async (query: string) => (await bills(query)).bills.map((bill) => bill.number);
+
+  expect(await numbers("enteredOn=2026-11-26")).toEqual(["last", "first"]);
+  expect(await numbers("enteredOn=2026-11-26&to=2026-11-02")).toEqual(["first"]);
+  expect(await numbers("enteredOn=")).toHaveLength(4);
+});
 
 test("filters apply together, and the total counts the matches on every page", async () => {
   const { addParty, dispatch, cancel, bills } = await startAgency();

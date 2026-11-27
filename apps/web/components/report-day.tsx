@@ -1,9 +1,10 @@
+import { addDays } from "@gasflow/shared";
 import Form from "next/form";
 import Link from "next/link";
 import { buttonStyles } from "@/components/button-styles";
 import { EmptyState } from "@/components/empty-state";
 import { Field } from "@/components/fields";
-import { addDays, formatDate } from "@/lib/dates";
+import { formatDate } from "@/lib/dates";
 import { OPENING_STOCK_PATH } from "@/lib/routes";
 
 // What the reports of one day have in common.

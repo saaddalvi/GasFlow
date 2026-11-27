@@ -216,10 +216,7 @@ export async function listPendingReturns(
   { customerId, page }: PendingReturnListQuery,
 ): Promise<PendingReturnList> {
   const asked = customerId ? Prisma.sql`c.customer_id = ${customerId}::uuid` : Prisma.sql`TRUE`;
-  const pending = Prisma.sql`
-    ${rowsWhere(asked)}
-    HAVING SUM(c.pending) > 0
-  `;
+  const pending = pendingRowsWhere(asked);
   const daysOutSince = await countingDaysOut(db, clock);
   const { rows, total } = await pageOfRows(db, pending, OLDEST_FIRST, page);
   return {
@@ -235,6 +232,27 @@ export async function listPendingReturns(
     total,
     page,
     pageSize: PAGE_SIZE,
+  };
+}
+
+/**
+ * All the cylinders on the pending returns list together: how many there are,
+ * how many customers have them and how many are overdue.
+ */
+export async function sumPendingReturns(db: Database, clock: Clock) {
+  const daysOutSince = await countingDaysOut(db, clock);
+  // Cylinders of one customer's dated one day are overdue or not together.
+  const sums = await db.$queryRaw<{ customerId: string; date: Date; pending: number }[]>`
+    SELECT r."customerId", r.date, SUM(r.pending)::int AS pending
+      FROM (${pendingRowsWhere(Prisma.sql`TRUE`)}) r
+     GROUP BY r."customerId", r.date
+  `;
+  const overdue = sums.filter(({ date }) => daysOutSince(fromDatabaseDate(date)).overdue);
+  const total = (rows: typeof sums) => rows.reduce((sum, row) => sum + row.pending, 0);
+  return {
+    quantity: total(sums),
+    customers: new Set(sums.map((row) => row.customerId)).size,
+    overdue: total(overdue),
   };
 }
 
@@ -485,6 +503,14 @@ function rowsWhere(condition: Prisma.Sql): Prisma.Sql {
      WHERE ${condition}
      GROUP BY c.bill_id, c.customer_id, c.customer_name, c.customer_active, c.type, c.paper_kind,
               c.number, c.date, c.entered_at, c.gas_id, g.name
+  `;
+}
+
+/** A query for the rows that meet the condition and have cylinders pending. */
+function pendingRowsWhere(condition: Prisma.Sql): Prisma.Sql {
+  return Prisma.sql`
+    ${rowsWhere(condition)}
+    HAVING SUM(c.pending) > 0
   `;
 }
 

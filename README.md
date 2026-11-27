@@ -29,8 +29,8 @@ pnpm dev               # starts the API and the web app
 ```
 
 Then open <http://localhost:3000> and sign in. If nobody has an account yet,
-[create the first admin](#create-the-first-admin). The page after sign-in lists
-the gases, which the web app reads from the API on <http://localhost:4000>.
+[create the first admin](#create-the-first-admin). The page after sign-in is the
+dashboard, which the web app reads from the API on <http://localhost:4000>.
 
 Before opening stock can be entered, an admin sets the start date once, on the
 **Opening stock** page. The app offers no way to change it.

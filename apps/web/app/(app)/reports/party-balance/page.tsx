@@ -65,7 +65,7 @@ export default async function BalanceRegisterPage({
             `${BALANCE_REGISTER_PATH}?${balanceRegisterSearch({ ...query, page })}`
           }
           narrowed={Boolean(query.search || query.type)}
-          all={query.show === "all"}
+          show={query.show}
         />
       ) : (
         <LoadError>
@@ -96,6 +96,7 @@ function Filters({ query }: { query: BalanceRegisterQuery }) {
         </SelectField>
         <SelectField label="Show" name="show" defaultValue={query.show}>
           <option value="non_zero">Non-zero holdings</option>
+          <option value="below_zero">Below zero</option>
           <option value="all">All parties</option>
         </SelectField>
         <Field label="Name" name="search" type="search" defaultValue={query.search} />
@@ -119,20 +120,19 @@ function Results({
   register: { date, startDate, parties, summary, total, page, pageSize },
   pageHref,
   narrowed,
-  all,
+  show,
 }: {
   register: BalanceRegister;
   pageHref: (page: number) => string;
   /** Whether a type or name was asked for. */
   narrowed: boolean;
-  /** Whether parties holding nothing were asked for too. */
-  all: boolean;
+  show: BalanceRegisterQuery["show"];
 }) {
   if (!startDate || date < startDate) {
     return <NoRecords startDate={startDate} />;
   }
   if (total === 0) {
-    return <EmptyState>{nothingListed(narrowed, all)}</EmptyState>;
+    return <EmptyState>{nothingListed(narrowed, show)}</EmptyState>;
   }
   return (
     <div className="space-y-3">
@@ -180,9 +180,14 @@ function Results({
 }
 
 /** Why no party is listed. */
-function nothingListed(narrowed: boolean, all: boolean): string {
-  if (all) {
+function nothingListed(narrowed: boolean, show: BalanceRegisterQuery["show"]): string {
+  if (show === "all") {
     return narrowed ? "No parties match." : "There are no customers or refillers yet.";
+  }
+  if (show === "below_zero") {
+    return narrowed
+      ? "No party that matches was below zero."
+      : "No customer or refiller was below zero.";
   }
   // A party that matches may be left out for holding nothing.
   return narrowed

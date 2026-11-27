@@ -1,4 +1,6 @@
 import {
+  addDays,
+  indianDayStart,
   billContentSchema,
   HOLDER_TYPES,
   PARTY_TYPES,
@@ -126,7 +128,19 @@ export async function listBills(db: Database, query: BillListQuery) {
 /** The bills that meet everything asked of them. */
 async function whereAsked(
   db: Database,
-  { number, slipNumber, paperKind, type, party, partyId, from, to, status, pending }: BillListQuery,
+  {
+    number,
+    slipNumber,
+    paperKind,
+    type,
+    party,
+    partyId,
+    from,
+    to,
+    enteredOn,
+    status,
+    pending,
+  }: BillListQuery,
 ): Promise<Prisma.BillWhereInput> {
   // The shop is on nearly every bill, so its name finds none of them.
   const partyNamed = party
@@ -143,12 +157,18 @@ async function whereAsked(
       gte: from && toDatabaseDate(from),
       lte: to && toDatabaseDate(to),
     },
+    enteredAt: enteredOn ? enteredDuring(enteredOn) : undefined,
     // Each of these is met by either side of a bill.
     AND: [
       partyNamed ? { OR: [{ fromParty: partyNamed }, { toParty: partyNamed }] } : {},
       partyId ? { OR: [{ fromPartyId: partyId }, { toPartyId: partyId }] } : {},
     ],
   };
+}
+
+/** The moments of the date in India, for narrowing bills by when they were entered. */
+export function enteredDuring(date: string): Prisma.DateTimeFilter<"Bill"> {
+  return { gte: indianDayStart(date), lt: indianDayStart(addDays(date, 1)) };
 }
 
 /** The posted bill that has this number on this paper kind, if there is one. */

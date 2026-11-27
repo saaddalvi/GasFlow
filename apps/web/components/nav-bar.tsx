@@ -7,13 +7,16 @@ import { useEffect, useId, useRef } from "react";
 import {
   BALANCE_REGISTER_PATH,
   BILLS_PATH,
+  DASHBOARD_PATH,
   DAY_LEDGER_PATH,
+  GASES_PATH,
   OPENING_STOCK_PATH,
   PARTIES_PATH,
   RECEIVE_EMPTIES_PATH,
   SIGN_IN_PATH,
   STOCK_CARD_PATH,
   STOCK_REPORT_PATH,
+  VEHICLES_PATH,
 } from "@/lib/routes";
 import { LogoMark } from "./logo-mark";
 
@@ -23,11 +26,12 @@ interface NavLink {
 }
 
 const LINKS: (NavLink & { adminOnly?: boolean })[] = [
-  { href: "/", label: "Gases" },
+  { href: DASHBOARD_PATH, label: "Dashboard" },
   { href: RECEIVE_EMPTIES_PATH, label: "Receive empties" },
   { href: BILLS_PATH, label: "Bills" },
   { href: PARTIES_PATH, label: "Parties" },
-  { href: "/vehicles", label: "Vehicles" },
+  { href: GASES_PATH, label: "Gases" },
+  { href: VEHICLES_PATH, label: "Vehicles" },
   { href: OPENING_STOCK_PATH, label: "Opening stock" },
   { href: "/staff", label: "Staff", adminOnly: true },
 ];
@@ -51,7 +55,7 @@ export function NavBar({
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white print:hidden">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
-        <Link href="/" className="flex min-w-0 items-center gap-2">
+        <Link href={DASHBOARD_PATH} className="flex min-w-0 items-center gap-2">
           <LogoMark />
           <span className="truncate font-semibold">{shopName}</span>
         </Link>
@@ -71,7 +75,9 @@ function useNavLinks(isAdmin: boolean) {
   // A link stays marked on the pages under it, unless another link is closer.
   const current = [...LINKS, ...REPORT_LINKS]
     .map((link) => link.href)
-    .filter((href) => pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)))
+    .filter(
+      (href) => pathname === href || (href !== DASHBOARD_PATH && pathname.startsWith(`${href}/`)),
+    )
     .sort((a, b) => b.length - a.length)[0];
   return { links: LINKS.filter((link) => isAdmin || !link.adminOnly), current };
 }

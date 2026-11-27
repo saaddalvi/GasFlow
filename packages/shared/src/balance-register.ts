@@ -9,14 +9,17 @@ export const REGISTER_PARTY_TYPES = ["customer", "refiller"] as const;
 
 const registerPartyTypeSchema = z.enum(REGISTER_PARTY_TYPES, "Choose customer or refiller.");
 
-/** Whether to list only parties holding cylinders, or fewer than none, or every party. */
-export const REGISTER_SHOWS = ["non_zero", "all"] as const;
+/**
+ * Whether to list only parties holding cylinders, or fewer than none; only those
+ * with fewer than none of some gas; or every party.
+ */
+export const REGISTER_SHOWS = ["non_zero", "below_zero", "all"] as const;
 
 export const balanceRegisterQuerySchema = z.object({
   /** The day to report as it ended. Left out, it is today. */
   date: queryDate,
   type: optionalChoice(registerPartyTypeSchema),
-  show: optionalChoice(z.enum(REGISTER_SHOWS, "Choose non-zero or all.")).transform(
+  show: optionalChoice(z.enum(REGISTER_SHOWS, "Choose non-zero, below zero or all.")).transform(
     (show) => show ?? "non_zero",
   ),
   /** Part of a name, in any capitals. */

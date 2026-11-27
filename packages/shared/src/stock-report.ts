@@ -26,6 +26,11 @@ export const stockReportRowSchema = z.object({
 
 export type StockReportRow = z.infer<typeof stockReportRowSchema>;
 
+/** The cylinders at the shop in every fill state together. */
+export function countAtShop({ filled, empty, defective }: StockReportRow["shop"]): number {
+  return filled + empty + defective;
+}
+
 /** Where the cylinders were at the end of one day. */
 export const stockReportSchema = z.object({
   date: dateSchema,

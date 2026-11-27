@@ -230,6 +230,15 @@ test("asked for all, every customer and refiller is listed", async () => {
   expect(listed.parties[3]).toMatchObject({ gases: [], total: 0 });
 });
 
+test("asked for those below zero, only parties with a gas below zero are listed", async () => {
+  const { register } = await startWithParties();
+
+  const listed = await register("show=below_zero");
+
+  expect(names(listed)).toEqual(["Deccan Gases", "Lotus Clinic"]);
+  expect(listed).toMatchObject({ summary: { held: -2, belowZero: 2 }, total: 2 });
+});
+
 test("the header counts the parties listed, the cylinders they hold and who is below zero", async () => {
   const { register, held } = await startWithParties();
 
