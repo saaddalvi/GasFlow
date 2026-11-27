@@ -59,3 +59,9 @@ For the project owner to decide:
 
 - Pushed up to `77f7168`, and [CI passed on it](https://github.com/saaddalvi/GasFlow/actions/runs/46010842834).
 - The checks under "Still to do" are not recorded as done.
+
+**27 November 2026: completed** in commit `6b5a4c9`.
+
+- The project owner asked for the ticket to be marked complete. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
+- The code committed in `6b5a4c9` has not changed since.
+- The decisions listed for the project owner are not recorded as settled.
