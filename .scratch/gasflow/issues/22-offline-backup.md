@@ -16,7 +16,7 @@
 
 ## Comments
 
-**27 November 2026: built in commit `fdf03f9`, waiting on a check by hand.** Not pushed.
+**27 November 2026: built in commit `fdf03f9`, waiting on a check by hand.** Pushed since, as recorded at the end.
 
 Still to do, signed in with real accounts. No migration is new.
 
@@ -57,4 +57,15 @@ For the project owner to decide:
 - The file has parties' notes, but no mobile numbers, contacts or addresses.
 - A bill does not say who entered it, what a return was matched to, or what is still pending on it.
 - Anyone who has a downloaded file can read it, with no sign-in.
+
+**27 November 2026: pushed.**
+
+- Pushed up to `ff1b32f`, and [CI passed on it](https://github.com/saaddalvi/GasFlow/actions/runs/46014632112).
+- The checks under "Still to do" are not recorded as done.
+
+**27 November 2026: completed** in commit `fdf03f9`.
+
+- The project owner asked for the ticket to be marked complete. No results of the checks under "Still to do", signed in with real accounts, offline on the agency's computers and phones or with real records, are recorded here.
+- The code committed in `fdf03f9` has not changed since.
+- The decisions listed for the project owner are not recorded as settled.
 
