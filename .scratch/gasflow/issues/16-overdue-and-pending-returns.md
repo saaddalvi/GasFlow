@@ -16,7 +16,7 @@
 
 ## Comments
 
-**27 November 2026: built in commit `051d8b3`, waiting on a check by hand.** Not pushed, so CI has not run on it.
+**27 November 2026: built in commit `051d8b3`, waiting on a check by hand.** Pushed since, as recorded at the end.
 
 Still to do, signed in with real accounts. **Run `pnpm db:migrate` first**: Receive empties, matching, customer write-offs and Pending returns all need the new migration.
 
@@ -55,3 +55,11 @@ For later tickets:
 
 - Ticket 17: `receiveEmptiesFromPath` in `lib/routes.ts` opens **Receive empties** for a customer. `components/days-out.tsx` shows days out and marks overdue rows.
 - Ticket 21: the pending returns card can link to `/returns/pending`. Its totals of cylinders, customers and overdue ones are not given by the list, which answers a page at a time.
+
+**27 November 2026: completed** in commit `051d8b3`.
+
+- Pushed up to `ab2d58e`, and [CI passed on it](https://github.com/saaddalvi/GasFlow/actions/runs/45979457440).
+- The project owner asked for the ticket to be marked complete. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
+- The new migration, `20261127110000_add_overdue_limit`, has been applied to the development database.
+- The code committed in `051d8b3` has not changed since.
+- The decisions listed for the project owner are not recorded as settled.
