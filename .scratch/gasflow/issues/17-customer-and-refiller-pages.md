@@ -15,7 +15,7 @@
 
 ## Comments
 
-**27 November 2026: built in commit `6f15394`, waiting on a check by hand.** Not pushed, so CI has not run on it.
+**27 November 2026: built in commit `6f15394`, waiting on a check by hand.** Pushed since, as recorded at the end.
 
 Still to do, signed in with real accounts. No migration is new.
 
@@ -60,3 +60,10 @@ For later tickets:
 - Ticket 19: `findHoldings` in `services/holdings.ts` gives holdings as of now. The balance register needs them as of a date; `MOVEMENTS` has each movement's date.
 - Ticket 20: the **Stock card** button belongs in the heading of a party's page.
 - Ticket 21: `sumHoldings` counts every posted bill. Decide whether the dashboard's figures should match it or the Stock report.
+
+**27 November 2026: completed** in commit `6f15394`.
+
+- Pushed up to `85ecf46`, and [CI passed on it](https://github.com/saaddalvi/GasFlow/actions/runs/45983411933).
+- The project owner asked for the ticket to be marked complete. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
+- The code committed in `6f15394` has not changed since.
+- The decisions listed for the project owner are not recorded as settled.
