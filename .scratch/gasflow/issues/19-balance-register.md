@@ -16,7 +16,7 @@
 
 ## Comments
 
-**27 November 2026: built in commit `48d1dd1`, waiting on a check by hand.** Not pushed, so CI has not run on it.
+**27 November 2026: built in commit `48d1dd1`, waiting on a check by hand.** Pushed since, as recorded at the end.
 
 Still to do, signed in with real accounts. No migration is new.
 
@@ -56,3 +56,8 @@ For later tickets:
 
 - Ticket 20: the card's closing holding for an end date should match `findHoldings` for that date.
 - Ticket 21: the Balance register tile can link to `BALANCE_REGISTER_PATH`.
+
+**27 November 2026: pushed.**
+
+- Pushed up to `b1370d5`, and CI passed on it, as the project owner reported.
+- The checks under "Still to do" are not recorded as done.
