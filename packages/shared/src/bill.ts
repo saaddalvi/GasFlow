@@ -2,7 +2,7 @@ import { z } from "zod";
 import { dateSchema, indianDate } from "./date";
 import { gasSchema } from "./gas";
 import { PARTY_TYPES } from "./party";
-import { optionalChoice, queryPage } from "./query";
+import { optionalChoice, queryDate, queryFlag, queryPage, querySearch } from "./query";
 import type { Staff } from "./staff";
 import { optionalText, requiredText } from "./text";
 import { vehicleSchema } from "./vehicle";
@@ -13,15 +13,18 @@ export const fillStateSchema = z.enum(FILL_STATES, "Choose filled, empty or defe
 
 export type FillState = z.infer<typeof fillStateSchema>;
 
-export const billTypeSchema = z.enum([
-  "opening_stock",
-  "dispatch",
-  "send_to_refiller",
-  "return_from_refiller",
-  "return_from_customer",
-  "add_cylinders",
-  "write_off",
-]);
+export const billTypeSchema = z.enum(
+  [
+    "opening_stock",
+    "dispatch",
+    "send_to_refiller",
+    "return_from_refiller",
+    "return_from_customer",
+    "add_cylinders",
+    "write_off",
+  ],
+  "Choose the type of bill.",
+);
 
 export type BillType = z.infer<typeof billTypeSchema>;
 
@@ -118,6 +121,11 @@ const returnCounts = {
   writtenOff: z.int().nonnegative(),
   pending: z.int().nonnegative(),
 };
+
+/** Those counts for a whole bill, of every gas together. */
+const billReturnCountsSchema = z.object(returnCounts);
+
+export type ReturnCounts = z.infer<typeof billReturnCountsSchema>;
 
 /**
  * What has come back or been written off against a bill that cylinders can be
@@ -241,29 +249,50 @@ export const billSchema = billContentSchema.extend({
 export type Bill = z.infer<typeof billSchema>;
 
 export const billListQuerySchema = z.object({
+  /** Narrows the list to the bills whose number contains this. */
+  number: querySearch,
+  /** Narrows the list to the returns whose paper slip number contains this. */
+  slipNumber: querySearch,
+  paperKind: optionalChoice(paperKindSchema),
+  type: optionalChoice(billTypeSchema),
+  /** Narrows the list to the bills naming a customer, refiller or supplier like this. */
+  party: querySearch,
+  /** The first and last dates of the bills wanted. */
+  from: queryDate,
+  to: queryDate,
   /** Narrows the list to the bills that count, or to those cancelled. */
   status: optionalChoice(billStatusSchema),
+  /** Whether to list only the dispatch bills with cylinders pending. */
+  pending: queryFlag,
   page: queryPage,
 });
 
 export type BillListQuery = z.infer<typeof billListQuerySchema>;
 
+/** A bill as a list shows it. */
+export const listedBillSchema = billSchema
+  .pick({
+    id: true,
+    type: true,
+    paperKind: true,
+    number: true,
+    date: true,
+    status: true,
+    from: true,
+    to: true,
+    writeOffReason: true,
+    lines: true,
+  })
+  .extend({
+    /** Set on posted dispatch bills, and only on those. */
+    returns: billReturnCountsSchema.nullable(),
+  });
+
+export type ListedBill = z.infer<typeof listedBillSchema>;
+
 /** One page of the bills asked for, the newest first. */
 export const billListSchema = z.object({
-  bills: z.array(
-    billSchema.pick({
-      id: true,
-      type: true,
-      paperKind: true,
-      number: true,
-      date: true,
-      status: true,
-      from: true,
-      to: true,
-      writeOffReason: true,
-      lines: true,
-    }),
-  ),
+  bills: z.array(listedBillSchema),
   /** How many such bills there are, on every page together. */
   total: z.int().nonnegative(),
   page: z.int().positive(),

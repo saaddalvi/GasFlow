@@ -1,6 +1,7 @@
 import {
   billContentSchema,
   HOLDER_TYPES,
+  PARTY_TYPES,
   type Bill,
   type BillContent,
   type BillListQuery,
@@ -8,11 +9,11 @@ import {
   type OpeningStockListQuery,
   type RefillerSlipNumberUseQuery,
 } from "@gasflow/shared";
-import type { Database, Transaction } from "../database";
-import { fromDatabaseDate } from "../database-date";
+import { containing, type Database, type Transaction } from "../database";
+import { fromDatabaseDate, toDatabaseDate } from "../database-date";
 import type { Prisma } from "../generated/prisma/client";
 import { Refusal } from "../refusal";
-import { getBillReturns } from "./pending";
+import { countDispatchReturns, findPendingDispatchIds, getBillReturns } from "./pending";
 
 // Reading bills. Only the ledger changes them.
 
@@ -94,8 +95,9 @@ export async function readContent(tx: Transaction, billId: string): Promise<Bill
 }
 
 /** One page of the bills, of either status unless one is asked for, the newest first. */
-export async function listBills(db: Database, { status, page }: BillListQuery) {
-  const where = { status };
+export async function listBills(db: Database, query: BillListQuery) {
+  const { page } = query;
+  const where = await whereAsked(db, query);
   // Not in a transaction, whose one connection cannot run the queries for a
   // bill's parties and lines side by side.
   const [bills, total] = await Promise.all([
@@ -109,7 +111,40 @@ export async function listBills(db: Database, { status, page }: BillListQuery) {
     }),
     db.bill.count({ where }),
   ]);
-  return { bills: bills.map(asReported), total, page, pageSize: PAGE_SIZE };
+  const counts = await countDispatchReturns(
+    db,
+    bills.map((bill) => bill.id),
+  );
+  return {
+    bills: bills.map((bill) => ({ ...asReported(bill), returns: counts.get(bill.id) ?? null })),
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+  };
+}
+
+/** The bills that meet everything asked of them. */
+async function whereAsked(
+  db: Database,
+  { number, slipNumber, paperKind, type, party, from, to, status, pending }: BillListQuery,
+): Promise<Prisma.BillWhereInput> {
+  // The shop is on nearly every bill, so its name finds none of them.
+  const partyNamed = party
+    ? { type: { in: [...PARTY_TYPES] }, name: containing(party) }
+    : undefined;
+  return {
+    id: pending ? { in: await findPendingDispatchIds(db) } : undefined,
+    number: number ? containing(number) : undefined,
+    slipNumber: slipNumber ? containing(slipNumber) : undefined,
+    paperKind,
+    type,
+    status,
+    date: {
+      gte: from && toDatabaseDate(from),
+      lte: to && toDatabaseDate(to),
+    },
+    OR: partyNamed && [{ fromParty: partyNamed }, { toParty: partyNamed }],
+  };
 }
 
 /** The posted bill that has this number on this paper kind, if there is one. */

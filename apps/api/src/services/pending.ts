@@ -11,6 +11,7 @@ import type {
   PendingRow,
   ReturnCustomerList,
   ReturnCustomerListQuery,
+  ReturnCounts,
 } from "@gasflow/shared";
 import { today, type Clock } from "../clock";
 import type { Database, Transaction } from "../database";
@@ -123,6 +124,37 @@ export function findAllocationsToBill(
      WHERE l.bill_id = ${billId}::uuid AND cb.status = 'posted'
      ORDER BY cb.date, cb.entered_at, cb.id, l.line_no
   `;
+}
+
+/**
+ * The ids of the posted dispatch bills with cylinders pending. Each has at least
+ * one cylinder out, so there are no more of them than there are such cylinders.
+ */
+export async function findPendingDispatchIds(db: Database): Promise<string[]> {
+  const rows = await db.$queryRaw<{ billId: string }[]>`
+    WITH lines AS (${CLEARABLE_LINES})
+    SELECT DISTINCT bill_id AS "billId" FROM lines WHERE type = 'dispatch' AND pending > 0
+  `;
+  return rows.map((row) => row.billId);
+}
+
+/**
+ * How much of each of these bills that is a posted dispatch has been returned and
+ * written off, by the bill's id. Other bills are left out.
+ */
+export async function countDispatchReturns(
+  db: Database,
+  billIds: string[],
+): Promise<Map<string, ReturnCounts>> {
+  const rows = await db.$queryRaw<(ReturnCounts & { billId: string })[]>`
+    WITH lines AS (${CLEARABLE_LINES})
+    SELECT bill_id AS "billId", SUM(sent)::int AS sent, SUM(returned)::int AS returned,
+           SUM(written_off)::int AS "writtenOff", SUM(pending)::int AS pending
+      FROM lines
+     WHERE type = 'dispatch' AND bill_id = ANY(${billIds}::uuid[])
+     GROUP BY bill_id
+  `;
+  return new Map(rows.map(({ billId, ...counts }) => [billId, counts]));
 }
 
 /** What the customer can return or have written off cylinders against on the date. */

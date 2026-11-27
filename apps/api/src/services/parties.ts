@@ -5,7 +5,7 @@ import {
   type PartyChanges,
   type PartyListQuery,
 } from "@gasflow/shared";
-import type { Database } from "../database";
+import { containing, type Database } from "../database";
 import { Refusal } from "../refusal";
 import { abbreviate } from "./abbreviation";
 
@@ -17,7 +17,7 @@ export async function listParties(db: Database, query: PartyListQuery) {
   const where = {
     type: type ?? { in: [...PARTY_TYPES] },
     active: inactive ? undefined : true,
-    name: search ? { contains: likeLiteral(search), mode: "insensitive" as const } : undefined,
+    name: search ? containing(search) : undefined,
   };
   const [parties, total] = await db.$transaction([
     db.party.findMany({
@@ -64,11 +64,6 @@ export async function changeParty(db: Database, partyId: string, changes: PartyC
 
 export function noSuchParty(): Refusal {
   return new Refusal(404, "There is no such party.");
-}
-
-/** The text as itself in a LIKE pattern, which Prisma leaves to its caller. */
-function likeLiteral(text: string): string {
-  return text.replace(/[\\%_]/g, "\\$&");
 }
 
 /** Any party, including the shop. */
