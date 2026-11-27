@@ -6,13 +6,13 @@
 
 **Status:** ready-for-agent
 
-- [ ] For a chosen date, the shop's Opening, In, Out and Closing counts are shown by gas with totals, in separate tables for Filled, Empty and, when used, Defective
-- [ ] There is a date picker with previous and next day, and no location selector
-- [ ] Dispatches, returns, refiller movements, add cylinders and shop write-offs count as In or Out
-- [ ] Opening stock forms the starting position and is not shown as In
-- [ ] Customer and refiller write-offs do not change the shop
-- [ ] Cancelled bills are excluded, and back-dated bills appear on their own date
-- [ ] Each day's closing equals the next day's opening and matches the Stock report
+- [x] For a chosen date, the shop's Opening, In, Out and Closing counts are shown by gas with totals, in separate tables for Filled, Empty and, when used, Defective
+- [x] There is a date picker with previous and next day, and no location selector
+- [x] Dispatches, returns, refiller movements, add cylinders and shop write-offs count as In or Out
+- [x] Opening stock forms the starting position and is not shown as In
+- [x] Customer and refiller write-offs do not change the shop
+- [x] Cancelled bills are excluded, and back-dated bills appear on their own date
+- [x] Each day's closing equals the next day's opening and matches the Stock report
 
 ## Comments
 
@@ -57,3 +57,9 @@ For later tickets:
 
 - Pushed up to `ecf9785`, and CI passed on it, as the project owner reported.
 - The checks under "Still to do" are not recorded as done.
+
+**27 November 2026: completed** in commit `574cf74`.
+
+- The project owner asked for the ticket to be marked complete. No results of the checks under "Still to do", signed in with real accounts or on a real phone, are recorded here.
+- The code committed in `574cf74` has not changed since.
+- The decisions listed for the project owner are not recorded as settled.
