@@ -19,8 +19,9 @@ export default async function UnmatchedReturnsPage({
 }) {
   await auth.protect();
   // An address typed by hand that asks for nonsense gets the first page.
-  const asked = unmatchedListQuerySchema.safeParse(await searchParams);
-  const list = await orNull(fetchUnmatched(asked.data ?? unmatchedListQuerySchema.parse({})));
+  // Every customer's, whatever else it asks for.
+  const asked = unmatchedListQuerySchema.pick({ page: true }).safeParse(await searchParams);
+  const list = await orNull(fetchUnmatched(asked.data ?? { page: 1 }));
 
   return (
     <div className="space-y-6">

@@ -5,9 +5,11 @@ import {
   type PartyChanges,
   type PartyListQuery,
 } from "@gasflow/shared";
-import { containing, type Database } from "../database";
+import { containing, type Database, type Transaction } from "../database";
 import { Refusal } from "../refusal";
 import { abbreviate } from "./abbreviation";
+import { findHoldings } from "./holdings";
+import { countUnmatchedOf } from "./unmatched";
 
 const PAGE_SIZE = 50;
 
@@ -47,20 +49,72 @@ export async function getParty(db: Database, partyId: string) {
   return party;
 }
 
-/** Changes what is mentioned. An abbreviation made blank is made from the name again. */
-export async function changeParty(db: Database, partyId: string, changes: PartyChanges) {
-  const party = await findParty(db, partyId);
-  if (party.type === "shop") {
-    throw new Refusal(409, "The shop cannot be changed.");
-  }
-  const abbreviation =
-    changes.abbreviation === null ? abbreviate(changes.name ?? party.name) : changes.abbreviation;
-  return db.party.update({
-    where: { id: partyId },
-    data: { ...changes, abbreviation },
-    select: PARTY,
+/**
+ * Changes what is mentioned. An abbreviation made blank is made from the name
+ * again. A party with cylinders or unmatched returns cannot be deactivated.
+ */
+export function changeParty(db: Database, partyId: string, changes: PartyChanges) {
+  return db.$transaction(async (tx) => {
+    // Held, so that no bill can be saved for the party between the checks and the change.
+    const party = await lockParty(tx, partyId);
+    if (party.type === "shop") {
+      throw new Refusal(409, "The shop cannot be changed.");
+    }
+    // One that is already inactive can still be edited, whatever it has come to hold.
+    if (party.active && changes.active === false) {
+      await refuseWhileOpen(tx, partyId, party.name);
+    }
+    const abbreviation =
+      changes.abbreviation === null ? abbreviate(changes.name ?? party.name) : changes.abbreviation;
+    return tx.party.update({
+      where: { id: partyId },
+      data: { ...changes, abbreviation },
+      select: PARTY,
+    });
   });
 }
+
+/**
+ * The party, held until the transaction ends, so that two saves for one party
+ * take turns. Bills can still name it in the meantime.
+ */
+export async function lockParty(tx: Transaction, partyId: string) {
+  await tx.$queryRaw`SELECT 1 FROM parties WHERE id = ${partyId}::uuid FOR NO KEY UPDATE`;
+  const party = await tx.party.findUnique({
+    where: { id: partyId },
+    select: { name: true, type: true, active: true },
+  });
+  if (!party) {
+    throw noSuchParty();
+  }
+  return party;
+}
+
+/**
+ * Refuses to hide a party with matters still open: cylinders it holds, even fewer
+ * than none, or returns not yet matched to a bill. Says what they are.
+ */
+async function refuseWhileOpen(tx: Transaction, partyId: string, name: string): Promise<void> {
+  const held = await findHoldings(tx, [partyId]);
+  const unmatched = await countUnmatchedOf(tx, partyId);
+  const reasons: string[] = [];
+  if (held.length > 0) {
+    reasons.push(`It holds ${listed(held)}.`);
+  }
+  if (unmatched.length > 0) {
+    reasons.push(`It has ${listed(unmatched)} unmatched.`);
+  }
+  if (reasons.length > 0) {
+    throw new Refusal(409, [`${name} cannot be deactivated.`, ...reasons].join(" "));
+  }
+}
+
+/** Counts of gases as one reads them, such as "5 Argon, 2 Air and 1 Nitrogen". */
+function listed(counts: { gasName: string; quantity: number }[]): string {
+  return LIST.format(counts.map(({ gasName, quantity }) => `${quantity} ${gasName}`));
+}
+
+const LIST = new Intl.ListFormat("en-GB");
 
 export function noSuchParty(): Refusal {
   return new Refusal(404, "There is no such party.");

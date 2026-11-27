@@ -7,13 +7,11 @@ import {
   PAPER_KINDS,
   type BillList,
   type BillListQuery,
-  type ListedBill,
-  type ReturnCounts,
 } from "@gasflow/shared";
 import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
-import { BillStatusTag } from "@/components/bill-status-tag";
+import { BillTable } from "@/components/bill-table";
 import { buttonStyles } from "@/components/button-styles";
 import { EmptyState } from "@/components/empty-state";
 import { CheckboxField, Field, SelectField } from "@/components/fields";
@@ -21,15 +19,9 @@ import { LoadError } from "@/components/load-error";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyPage, Pagination } from "@/components/pagination";
 import { fetchBills, orNull } from "@/lib/api";
-import {
-  BILL_STATUS_NAMES,
-  BILL_TYPE_NAMES,
-  describeBillType,
-  quantitiesByGas,
-} from "@/lib/bill-names";
+import { BILL_STATUS_NAMES, BILL_TYPE_NAMES } from "@/lib/bill-names";
 import { billListSearch } from "@/lib/bill-list-search";
-import { formatDate } from "@/lib/dates";
-import { billPath, BILLS_PATH, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
+import { BILLS_PATH, NEW_BILL_PATH, OPENING_STOCK_PATH } from "@/lib/routes";
 
 export const metadata: Metadata = {
   title: "Bills · GasFlow",
@@ -42,7 +34,8 @@ export default async function BillsPage({
 }) {
   await auth.protect();
   // An address typed by hand that asks for nonsense gets the first page.
-  const asked = billListQuerySchema.safeParse(await searchParams);
+  // One party's bills are listed on its own page, as nothing here shows that choice.
+  const asked = billListQuerySchema.omit({ partyId: true }).safeParse(await searchParams);
   const query = asked.data ?? billListQuerySchema.parse({});
   const list = await orNull(fetchBills(query));
 
@@ -165,41 +158,7 @@ function Results({
       <p className="text-sm font-medium text-slate-700 tabular-nums">
         {total === 1 ? "1 bill" : `${total} bills`}
       </p>
-      {/* Relative, so that the hidden words in the table scroll with it. */}
-      <div className="relative overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
-            <tr>
-              <th scope="col" className="px-5 py-3 font-semibold">
-                Number
-              </th>
-              <th scope="col" className="hidden px-3 py-3 font-semibold md:table-cell">
-                Date
-              </th>
-              <th scope="col" className="hidden px-3 py-3 font-semibold md:table-cell">
-                Type
-              </th>
-              <th scope="col" className="px-3 py-3 font-semibold">
-                From and to
-              </th>
-              <th scope="col" className="hidden px-3 py-3 font-semibold lg:table-cell">
-                Lines
-              </th>
-              <th scope="col" className="hidden px-3 py-3 font-semibold sm:table-cell">
-                Returned
-              </th>
-              <th scope="col" className="hidden px-5 py-3 font-semibold sm:table-cell">
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {bills.map((bill) => (
-              <Row key={bill.id} bill={bill} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <BillTable bills={bills} />
       <Pagination
         page={page}
         pageSize={pageSize}
@@ -208,66 +167,5 @@ function Results({
         pageHref={pageHref}
       />
     </div>
-  );
-}
-
-/** One bill. On a narrow screen, what has no column of its own sits under another. */
-function Row({ bill }: { bill: ListedBill }) {
-  const { id, number, date, from, to, lines, status, returns } = bill;
-  const quantities = quantitiesByGas(lines);
-
-  return (
-    <tr className="align-top">
-      <td className="px-5 py-3">
-        <Link
-          href={billPath(id)}
-          className="font-medium text-brand-700 tabular-nums wrap-anywhere hover:underline"
-        >
-          {number}
-        </Link>
-        <span className="block text-slate-500 md:hidden">{formatDate(date)}</span>
-        <span className="block text-slate-500 md:hidden">{describeBillType(bill)}</span>
-        <span className="mt-1 block sm:hidden">
-          <BillStatusTag status={status} />
-        </span>
-      </td>
-      <td className="hidden whitespace-nowrap px-3 py-3 md:table-cell">{formatDate(date)}</td>
-      <td className="hidden px-3 py-3 md:table-cell">{describeBillType(bill)}</td>
-      <td className="px-3 py-3 wrap-anywhere">
-        {from && <span className="block text-slate-500">{from.name} →</span>}
-        {/* Only a write-off has nobody receiving. */}
-        {to ? to.name : "Written off"}
-        <span className="mt-1 block text-slate-500 lg:hidden">{quantities}</span>
-        {returns && (
-          <span className="mt-1 block sm:hidden">
-            Returned <Returned counts={returns} />
-          </span>
-        )}
-      </td>
-      <td className="hidden px-3 py-3 lg:table-cell">{quantities}</td>
-      <td className="hidden px-3 py-3 sm:table-cell">{returns && <Returned counts={returns} />}</td>
-      <td className="hidden px-5 py-3 sm:table-cell">
-        <BillStatusTag status={status} />
-      </td>
-    </tr>
-  );
-}
-
-/**
- * How many of a dispatch's cylinders have come back, such as "3 / 5". Any written
- * off are said too, as they are not pending either.
- */
-function Returned({ counts: { sent, returned, writtenOff } }: { counts: ReturnCounts }) {
-  return (
-    <>
-      <span className="whitespace-nowrap tabular-nums">
-        {returned} / {sent}
-      </span>
-      {writtenOff > 0 && (
-        <span className="block whitespace-nowrap text-slate-500 tabular-nums">
-          {writtenOff} written off
-        </span>
-      )}
-    </>
   );
 }

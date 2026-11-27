@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FILL_STATE_NAMES, WRITE_OFF_REASON_NAMES } from "@/lib/bill-names";
 import { BILL_PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { vehicleName } from "@/lib/vehicle-names";
+import { partyPath } from "@/lib/routes";
 
 // The parts a bill is shown in, as it stands and as it stood before a correction.
 
@@ -57,7 +58,7 @@ function PartyName({ party: { id, name, type } }: { party: BillParty }) {
       {type === "shop" ? (
         name
       ) : (
-        <Link href={`/parties/${id}`} className="text-brand-700 hover:underline">
+        <Link href={partyPath(id)} className="text-brand-700 hover:underline">
           {name}
         </Link>
       )}{" "}

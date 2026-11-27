@@ -37,15 +37,38 @@ export function findUnmatchedLines(
   `;
 }
 
+/**
+ * What a customer has returned that is matched to no bill, of each gas there is
+ * any of, in the order of the gases.
+ */
+export function countUnmatchedOf(
+  tx: Transaction,
+  customerId: string,
+): Promise<{ gasName: string; quantity: number }[]> {
+  return tx.$queryRaw<{ gasName: string; quantity: number }[]>`
+    WITH lines AS (${RETURN_LINES})
+    SELECT g.name::text AS "gasName", SUM(r.unmatched)::int AS quantity
+      FROM lines r JOIN gases g ON g.id = r.gas_id
+     WHERE r.customer_id = ${customerId}::uuid
+     GROUP BY g.id
+    HAVING SUM(r.unmatched) > 0
+     ORDER BY g.sort_order, g.name
+  `;
+}
+
 export function noSuchReturn(): Refusal {
   return new Refusal(404, "There is no such return.");
 }
 
-/** One page of the unmatched cylinders of each return and gas, the oldest return first. */
+/**
+ * One page of the unmatched cylinders of each return and gas, from the customer
+ * named or from any, the oldest return first.
+ */
 export async function listUnmatched(
   db: Database,
-  { page }: UnmatchedListQuery,
+  { customerId, page }: UnmatchedListQuery,
 ): Promise<UnmatchedList> {
+  const asked = customerId ? Prisma.sql`r.customer_id = ${customerId}::uuid` : Prisma.sql`TRUE`;
   const unmatched = Prisma.sql`
     WITH lines AS (${RETURN_LINES})
     SELECT r.return_id AS "returnId", r.number::text AS number, r.date,
@@ -55,6 +78,7 @@ export async function listUnmatched(
       FROM lines r
       JOIN parties p ON p.id = r.customer_id
       JOIN gases g ON g.id = r.gas_id
+     WHERE ${asked}
      GROUP BY r.return_id, r.number, r.date, r.entered_at, p.id, p.name, g.id, g.name
     HAVING SUM(r.unmatched) > 0
   `;

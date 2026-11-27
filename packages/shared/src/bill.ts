@@ -257,6 +257,8 @@ export const billListQuerySchema = z.object({
   type: optionalChoice(billTypeSchema),
   /** Narrows the list to the bills naming a customer, refiller or supplier like this. */
   party: querySearch,
+  /** Narrows the list to the bills naming this one party. */
+  partyId: optionalChoice(z.uuid("Choose a party.").toLowerCase()),
   /** The first and last dates of the bills wanted. */
   from: queryDate,
   to: queryDate,

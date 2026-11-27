@@ -4,14 +4,20 @@ import { SignOutButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { BILLS_PATH, OPENING_STOCK_PATH, RECEIVE_EMPTIES_PATH, SIGN_IN_PATH } from "@/lib/routes";
+import {
+  BILLS_PATH,
+  OPENING_STOCK_PATH,
+  PARTIES_PATH,
+  RECEIVE_EMPTIES_PATH,
+  SIGN_IN_PATH,
+} from "@/lib/routes";
 import { LogoMark } from "./logo-mark";
 
 const LINKS = [
   { href: "/", label: "Gases" },
   { href: RECEIVE_EMPTIES_PATH, label: "Receive empties" },
   { href: BILLS_PATH, label: "Bills" },
-  { href: "/parties", label: "Parties" },
+  { href: PARTIES_PATH, label: "Parties" },
   { href: "/vehicles", label: "Vehicles" },
   { href: OPENING_STOCK_PATH, label: "Opening stock" },
   { href: "/reports/stock", label: "Stock" },

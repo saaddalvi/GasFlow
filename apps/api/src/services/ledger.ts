@@ -29,7 +29,7 @@ import { fromDatabaseDate, toDatabaseDate } from "../database-date";
 import { BlockedRefusal, Refusal } from "../refusal";
 import { noSuchBill, POSTED_OPENING_STOCK, readContent } from "./bills";
 import { noSuchGas } from "./gases";
-import { noSuchParty } from "./parties";
+import { lockParty } from "./parties";
 import {
   findAllocationsToBill,
   findClearableLines,
@@ -967,22 +967,6 @@ async function refuseUnrecordedDate(tx: Transaction, date: string): Promise<void
   if (date < startDate) {
     throw new Refusal(409, "A bill cannot be dated before the start date.");
   }
-}
-
-/**
- * The party, held until the transaction ends, so that two saves for one party
- * take turns. Bills can still name it in the meantime.
- */
-async function lockParty(tx: Transaction, partyId: string) {
-  await tx.$queryRaw`SELECT 1 FROM parties WHERE id = ${partyId}::uuid FOR NO KEY UPDATE`;
-  const party = await tx.party.findUnique({
-    where: { id: partyId },
-    select: { name: true, type: true, active: true },
-  });
-  if (!party) {
-    throw noSuchParty();
-  }
-  return party;
 }
 
 /**

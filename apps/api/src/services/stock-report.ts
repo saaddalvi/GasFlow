@@ -9,6 +9,7 @@ import { today, type Clock } from "../clock";
 import type { Database } from "../database";
 import { Prisma } from "../generated/prisma/client";
 import { listGases } from "./gases";
+import { MOVEMENTS } from "./holdings";
 import { getStartDate } from "./setup";
 
 /**
@@ -65,21 +66,12 @@ interface Count {
  */
 function countCylinders(db: Database, date: string): Promise<Count[]> {
   return db.$queryRaw<Count[]>`
-    WITH movements AS (
-      SELECT b.to_party_id AS party_id, l.gas_id, l.fill_state, l.quantity
-        FROM bills b JOIN bill_lines l ON l.bill_id = b.id
-       WHERE b.status = 'posted' AND b.date <= ${date}::date
-      UNION ALL
-      SELECT b.from_party_id, l.gas_id, l.fill_state, -l.quantity
-        FROM bills b JOIN bill_lines l ON l.bill_id = b.id
-       WHERE b.status = 'posted' AND b.date <= ${date}::date
-    )
     SELECT m.gas_id AS "gasId",
            p.type::text AS holder,
            m.fill_state::text AS "fillState",
            SUM(m.quantity)::int AS quantity
-      FROM movements m JOIN parties p ON p.id = m.party_id
-     WHERE p.type::text IN (${Prisma.join([...HOLDER_TYPES])})
+      FROM (${MOVEMENTS}) m JOIN parties p ON p.id = m.party_id
+     WHERE m.date <= ${date}::date AND p.type::text IN (${Prisma.join([...HOLDER_TYPES])})
      GROUP BY m.gas_id, p.type, m.fill_state
   `;
 }

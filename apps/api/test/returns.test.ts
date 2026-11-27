@@ -501,13 +501,16 @@ test.each(["refiller", "supplier"] as const)(
 
 test("empties cannot be received from an inactive customer", async () => {
   const agency = await startWithDispatch();
-  const { app, staff, customer, sent, returnFor, against } = agency;
-  await app.inject({
+  const { app, staff, customer, sent, receive, returnFor, against } = agency;
+  // Only a customer with nothing to bring back can be made inactive.
+  await receive(customer.id, [against(sent, "Medical oxygen", 5)]);
+  const deactivated = await app.inject({
     method: "PATCH",
     url: `/api/parties/${customer.id}`,
     headers: staff.headers,
     payload: { active: false },
   });
+  expect(deactivated.statusCode).toBe(200);
 
   await expectRefused(
     agency,

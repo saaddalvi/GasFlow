@@ -456,6 +456,8 @@ test("a correction cannot newly name an inactive customer, but may keep the bill
     409,
     "Lotus Clinic is inactive. Make it active first.",
   );
+  // Only a customer with nothing to bring back can be made inactive.
+  await agency.receive(customer.id, [agency.against(sent, "Medical oxygen", 5)]);
   await retire(agency, "parties", customer);
   expect((await correct(sent, six(agency))).lines).toMatchObject([{ quantity: 6 }]);
 });

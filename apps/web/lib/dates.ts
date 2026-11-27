@@ -16,6 +16,12 @@ const DAY_IN_FULL = new Intl.DateTimeFormat("en-IN", {
   timeZone: "UTC",
 });
 
+const MONTH = new Intl.DateTimeFormat("en-IN", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
 const MOMENT = new Intl.DateTimeFormat("en-IN", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -30,6 +36,11 @@ export function formatDate(date: string): string {
 /** A date with its weekday, to check against paper, such as "Thursday, 26 November 2026". */
 export function formatDateInFull(date: string): string {
   return DAY_IN_FULL.format(new Date(date));
+}
+
+/** The month a date is in, such as "November 2026". */
+export function formatMonth(date: string): string {
+  return MONTH.format(new Date(date));
 }
 
 /** A moment for people to read, in Indian Standard Time. */

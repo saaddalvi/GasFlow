@@ -15,6 +15,7 @@ import type { Outcome } from "@/lib/api";
 import { changedOnly } from "@/lib/changed-only";
 import { PARTY_TYPE_NAMES } from "@/lib/party-types";
 import { addParty, saveParty } from "./actions";
+import { PARTIES_PATH, partyPath } from "@/lib/routes";
 
 /** Adds a party, or changes the one given. */
 export function PartyForm({ party }: { party?: Party }) {
@@ -45,7 +46,7 @@ export function PartyForm({ party }: { party?: Party }) {
       <ActionForm
         action={submit}
         submitLabel={opened ? "Save changes" : "Create party"}
-        onCancel={() => router.push(opened ? `/parties/${opened.id}` : "/parties")}
+        onCancel={() => router.push(opened ? partyPath(opened.id) : PARTIES_PATH)}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           {/* A party keeps its type, so only a new one chooses. */}
@@ -101,7 +102,7 @@ export function PartyForm({ party }: { party?: Party }) {
               label="Active"
               name="active"
               defaultChecked={opened?.active ?? true}
-              hint="Inactive parties are not offered on anything new."
+              hint="Inactive parties are not offered on anything new. A party that holds cylinders or has unmatched returns has to stay active."
             />
           </div>
         </div>

@@ -10,17 +10,34 @@ import { LoadError } from "@/components/load-error";
 import { EmptyPage, Pagination } from "@/components/pagination";
 import type { Outcome } from "@/lib/api";
 import { formatDate } from "@/lib/dates";
-import { billPath, UNMATCHED_RETURNS_PATH } from "@/lib/routes";
+import { partyPageHref, type PartyPageQuery } from "@/lib/party-page-search";
+import { billPath, partyPath, UNMATCHED_RETURNS_PATH } from "@/lib/routes";
 import { useLastGiven } from "@/lib/use-last-given";
 import { matchToBill } from "./actions";
 import { MatchFields } from "./match-fields";
 
 const keyOf = (row: UnmatchedRow) => `${row.return.id} ${row.gas.id}`;
 
-const pageHref = (page: number) => `${UNMATCHED_RETURNS_PATH}?page=${page}`;
-
 /** The unmatched cylinders, each with the way to match them to a bill. */
-export function UnmatchedRows({ list }: { list: UnmatchedList | null }) {
+export function UnmatchedRows({
+  list,
+  customerPage,
+}: {
+  list: UnmatchedList | null;
+  /**
+   * Given on a customer's page, where the rows are that customer's alone, with
+   * what the rest of the page shows.
+   */
+  customerPage?: { customerId: string; query: PartyPageQuery };
+}) {
+  const pageHref = (page: number) =>
+    customerPage
+      ? partyPageHref(
+          customerPage.customerId,
+          { ...customerPage.query, unmatchedPage: page },
+          "unmatched",
+        )
+      : `${UNMATCHED_RETURNS_PATH}?page=${page}`;
   const shown = useLastGiven(list);
   // The row whose box was opened last.
   const [opened, setOpened] = useState<UnmatchedRow>();
@@ -78,6 +95,7 @@ export function UnmatchedRows({ list }: { list: UnmatchedList | null }) {
               <Row
                 key={keyOf(row)}
                 row={row}
+                named={!customerPage}
                 onMatch={() => {
                   setOpened(row);
                   setDone(undefined);
@@ -120,15 +138,26 @@ function dialogDescription(
     : `The ${gas.name} on ${returned.number} is no longer listed here.`;
 }
 
-function Row({ row, onMatch }: { row: UnmatchedRow; onMatch: () => void }) {
+function Row({
+  row,
+  named,
+  onMatch,
+}: {
+  row: UnmatchedRow;
+  /** Whether to say whose the cylinders are. */
+  named: boolean;
+  onMatch: () => void;
+}) {
   const { return: returned, customer, gas, quantity } = row;
 
   return (
     <li className="grid gap-3 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
       <div className="min-w-0 wrap-anywhere">
-        <Link href={`/parties/${customer.id}`} className="font-medium hover:underline">
-          {customer.name}
-        </Link>
+        {named && (
+          <Link href={partyPath(customer.id)} className="font-medium hover:underline">
+            {customer.name}
+          </Link>
+        )}
         <p>
           <Link
             href={billPath(returned.id)}

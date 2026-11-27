@@ -17,6 +17,14 @@ export function correctBillPath(billId: string): string {
   return `${billPath(billId)}/correct`;
 }
 
+/** Customers, refillers and suppliers. */
+export const PARTIES_PATH = "/parties";
+
+/** The page of one party. */
+export function partyPath(partyId: string): string {
+  return `${PARTIES_PATH}/${encodeURIComponent(partyId)}`;
+}
+
 /** Where cylinders coming back from a customer are recorded. */
 export const RECEIVE_EMPTIES_PATH = "/returns/new";
 

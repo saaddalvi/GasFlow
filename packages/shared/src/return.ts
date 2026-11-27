@@ -2,7 +2,7 @@ import { z } from "zod";
 import { billPartySchema, billSchema, fillStateSchema, quantitySchema } from "./bill";
 import { gasSchema } from "./gas";
 import { partyListQuerySchema, partySchema } from "./party";
-import { queryPage } from "./query";
+import { optionalChoice, queryPage } from "./query";
 import { optionalText } from "./text";
 
 /**
@@ -112,8 +112,14 @@ export const pendingListSchema = z.object({ rows: z.array(daysOutRowSchema) });
 
 export type PendingList = z.infer<typeof pendingListSchema>;
 
-/** Asks for every customer's pending cylinders, a page at a time. */
-export const pendingReturnListQuerySchema = z.object({ page: queryPage });
+/** One customer to narrow a list to, as a query string may name them. */
+const onlyCustomer = optionalChoice(z.uuid("Choose a customer.").toLowerCase());
+
+/** Asks for pending cylinders, every customer's or one's, a page at a time. */
+export const pendingReturnListQuerySchema = z.object({
+  customerId: onlyCustomer,
+  page: queryPage,
+});
 
 export type PendingReturnListQuery = z.infer<typeof pendingReturnListQuerySchema>;
 
@@ -125,7 +131,7 @@ export const pendingReturnSchema = daysOutRowSchema.extend({
 
 export type PendingReturn = z.infer<typeof pendingReturnSchema>;
 
-/** One page of what every customer has yet to return, the longest out first. */
+/** One page of what customers have yet to return, the longest out first. */
 export const pendingReturnListSchema = z.object({
   rows: z.array(pendingReturnSchema),
   /** How many such rows there are, on every page together. */
@@ -200,8 +206,8 @@ export const splitSchema = z.object({
 
 export type Split = z.infer<typeof splitSchema>;
 
-/** Asks for the unmatched returns, a page at a time. */
-export const unmatchedListQuerySchema = z.object({ page: queryPage });
+/** Asks for the unmatched returns, every customer's or one's, a page at a time. */
+export const unmatchedListQuerySchema = z.object({ customerId: onlyCustomer, page: queryPage });
 
 export type UnmatchedListQuery = z.infer<typeof unmatchedListQuerySchema>;
 

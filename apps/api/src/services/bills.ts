@@ -126,7 +126,7 @@ export async function listBills(db: Database, query: BillListQuery) {
 /** The bills that meet everything asked of them. */
 async function whereAsked(
   db: Database,
-  { number, slipNumber, paperKind, type, party, from, to, status, pending }: BillListQuery,
+  { number, slipNumber, paperKind, type, party, partyId, from, to, status, pending }: BillListQuery,
 ): Promise<Prisma.BillWhereInput> {
   // The shop is on nearly every bill, so its name finds none of them.
   const partyNamed = party
@@ -143,7 +143,11 @@ async function whereAsked(
       gte: from && toDatabaseDate(from),
       lte: to && toDatabaseDate(to),
     },
-    OR: partyNamed && [{ fromParty: partyNamed }, { toParty: partyNamed }],
+    // Each of these is met by either side of a bill.
+    AND: [
+      partyNamed ? { OR: [{ fromParty: partyNamed }, { toParty: partyNamed }] } : {},
+      partyId ? { OR: [{ fromPartyId: partyId }, { toPartyId: partyId }] } : {},
+    ],
   };
 }
 

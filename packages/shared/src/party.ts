@@ -14,6 +14,11 @@ export const HOLDER_TYPES = ["shop", "customer", "refiller"] as const;
 
 export type HolderType = (typeof HOLDER_TYPES)[number];
 
+/** Whether the cylinders of a party of this type are counted. */
+export function holdsCylinders(type: PartyType | HolderType): boolean {
+  return HOLDER_TYPES.some((holder) => holder === type);
+}
+
 export const partySchema = z.object({
   id: z.uuid(),
   type: partyTypeSchema,

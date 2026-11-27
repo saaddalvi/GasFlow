@@ -172,14 +172,18 @@ export async function listPending(
   return { rows: rows.map((row) => ({ ...row, ...daysOutSince(row.bill.date) })) };
 }
 
-/** One page of the rows with cylinders pending from any customer, the longest out first. */
+/**
+ * One page of the rows with cylinders pending, from the customer named or from any,
+ * the longest out first.
+ */
 export async function listPendingReturns(
   db: Database,
   clock: Clock,
-  { page }: PendingReturnListQuery,
+  { customerId, page }: PendingReturnListQuery,
 ): Promise<PendingReturnList> {
+  const asked = customerId ? Prisma.sql`c.customer_id = ${customerId}::uuid` : Prisma.sql`TRUE`;
   const pending = Prisma.sql`
-    ${rowsWhere(Prisma.sql`TRUE`)}
+    ${rowsWhere(asked)}
     HAVING SUM(c.pending) > 0
   `;
   const daysOutSince = await countingDaysOut(db, clock);

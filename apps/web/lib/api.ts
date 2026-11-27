@@ -4,12 +4,15 @@ import {
   billNumberUseSchema,
   billSchema,
   closedRowListSchema,
+  dailySummarySchema,
   splitSchema,
   gasListSchema,
   openingStockListSchema,
   openingStockPartiesSchema,
   overdueLimitSchema,
+  partyHoldingSchema,
   partyListSchema,
+  partyReportSchema,
   partySchema,
   pendingListSchema,
   pendingReturnListSchema,
@@ -31,6 +34,8 @@ import {
   type BlockingBill,
   type ClosedRowList,
   type ClosedRowListQuery,
+  type DailySummary,
+  type DailySummaryQuery,
   type Split,
   type SplitQuery,
   type GasList,
@@ -39,8 +44,10 @@ import {
   type OpeningStockParties,
   type OverdueLimit,
   type Party,
+  type PartyHolding,
   type PartyList,
   type PartyListQuery,
+  type PartyReport,
   type PendingList,
   type PendingQuery,
   type PendingReturnList,
@@ -78,6 +85,27 @@ export async function fetchParties(query: PartyListQuery): Promise<PartyList> {
 export async function fetchParty(partyId: string): Promise<Party | undefined> {
   const found = await findJson(`/api/parties/${encodeURIComponent(partyId)}`);
   return found === undefined ? undefined : partySchema.parse(found);
+}
+
+/** The parties asked for, with what each holds, and the figures for all of them. */
+export async function fetchPartyReport(query: PartyListQuery): Promise<PartyReport> {
+  return partyReportSchema.parse(await getJson(`/api/reports/parties?${partyListSearch(query)}`));
+}
+
+/** What the party holds now, and what has moved this month. */
+export async function fetchPartyHolding(partyId: string): Promise<PartyHolding> {
+  const path = `/api/parties/${encodeURIComponent(partyId)}/holding`;
+  return partyHoldingSchema.parse(await getJson(path));
+}
+
+/** One page of the days cylinders were sent to the party or returned by it. */
+export async function fetchDailySummary(
+  partyId: string,
+  { from = "", to = "", page }: DailySummaryQuery,
+): Promise<DailySummary> {
+  const query = new URLSearchParams({ from, to, page: String(page) });
+  const path = `/api/parties/${encodeURIComponent(partyId)}/daily-summary?${query}`;
+  return dailySummarySchema.parse(await getJson(path));
 }
 
 /** The bill, or undefined if there is none with this id. */
@@ -122,11 +150,13 @@ export async function fetchPending(query: PendingQuery): Promise<PendingList> {
   );
 }
 
-/** One page of what every customer has yet to return. */
+/** One page of what customers, or the one named, have yet to return. */
 export async function fetchPendingReturns({
+  customerId = "",
   page,
 }: PendingReturnListQuery): Promise<PendingReturnList> {
-  return pendingReturnListSchema.parse(await getJson(`/api/reports/pending-returns?page=${page}`));
+  const query = new URLSearchParams({ customerId, page: String(page) });
+  return pendingReturnListSchema.parse(await getJson(`/api/reports/pending-returns?${query}`));
 }
 
 /** The days out that cylinders must exceed to be overdue. */
@@ -149,9 +179,13 @@ export async function fetchClosedRows({
   return closedRowListSchema.parse(await getJson(`/api/returns/closed?${search}`));
 }
 
-/** One page of the unmatched returns. */
-export async function fetchUnmatched({ page }: UnmatchedListQuery): Promise<UnmatchedList> {
-  return unmatchedListSchema.parse(await getJson(`/api/returns/unmatched?page=${page}`));
+/** One page of the unmatched returns, from every customer or the one named. */
+export async function fetchUnmatched({
+  customerId = "",
+  page,
+}: UnmatchedListQuery): Promise<UnmatchedList> {
+  const query = new URLSearchParams({ customerId, page: String(page) });
+  return unmatchedListSchema.parse(await getJson(`/api/returns/unmatched?${query}`));
 }
 
 export async function fetchStartDate(): Promise<StartDate> {

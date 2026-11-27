@@ -200,8 +200,10 @@ test("only cylinders that customers hold are pending returns", async () => {
 });
 
 test("an inactive customer's pending cylinders are still listed, marked inactive", async () => {
-  const { app, staff, customer, dispatch, pendingReturns } = await start();
-  await dispatch(customer.id);
+  const agency = await start();
+  const { app, staff, customer, dispatch, receive, against, cancel, pendingReturns } = agency;
+  const sent = await dispatch(customer.id);
+  const returned = await receive(customer.id, [against(sent, "Medical oxygen", 5)]);
   const response = await app.inject({
     method: "PATCH",
     url: `/api/parties/${customer.id}`,
@@ -209,6 +211,8 @@ test("an inactive customer's pending cylinders are still listed, marked inactive
     payload: { active: false },
   });
   expect(response.statusCode).toBe(200);
+  // A return found wrong afterwards leaves its cylinders pending again.
+  await cancel(returned);
 
   expect((await pendingReturns()).rows).toMatchObject([
     { customer: { id: customer.id, active: false }, pending: 5 },
