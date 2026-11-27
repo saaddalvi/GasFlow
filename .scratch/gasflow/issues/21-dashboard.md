@@ -17,7 +17,7 @@
 
 ## Comments
 
-**27 November 2026: built in commit `6b5a4c9`, waiting on a check by hand.** Not pushed, so CI has not run on it.
+**27 November 2026: built in commit `6b5a4c9`, waiting on a check by hand.** Pushed since, as recorded at the end.
 
 Still to do, signed in with real accounts. No migration is new.
 
@@ -55,3 +55,7 @@ For the project owner to decide:
 - **Pending returns** includes bills dated after today, as its list does. **Your cylinders** stops at today, so the two can differ.
 - The overdue figure is of cylinders, not customers.
 
+**27 November 2026: pushed.**
+
+- Pushed up to `77f7168`, and [CI passed on it](https://github.com/saaddalvi/GasFlow/actions/runs/46010842834).
+- The checks under "Still to do" are not recorded as done.
