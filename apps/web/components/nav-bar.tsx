@@ -6,10 +6,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import {
   BILLS_PATH,
+  DAY_LEDGER_PATH,
   OPENING_STOCK_PATH,
   PARTIES_PATH,
   RECEIVE_EMPTIES_PATH,
   SIGN_IN_PATH,
+  STOCK_REPORT_PATH,
 } from "@/lib/routes";
 import { LogoMark } from "./logo-mark";
 
@@ -20,7 +22,8 @@ const LINKS = [
   { href: PARTIES_PATH, label: "Parties" },
   { href: "/vehicles", label: "Vehicles" },
   { href: OPENING_STOCK_PATH, label: "Opening stock" },
-  { href: "/reports/stock", label: "Stock" },
+  { href: STOCK_REPORT_PATH, label: "Stock" },
+  { href: DAY_LEDGER_PATH, label: "Day ledger" },
   { href: "/staff", label: "Staff", adminOnly: true },
 ];
 
@@ -63,7 +66,7 @@ function NavLinks({ isAdmin }: { isAdmin: boolean }) {
         key={href}
         href={href}
         aria-current={active ? "page" : undefined}
-        className={`rounded-md px-3 py-2 text-sm ${
+        className={`rounded-md px-3 py-2 text-sm lg:px-2 xl:px-3 ${
           active ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-100"
         }`}
       >

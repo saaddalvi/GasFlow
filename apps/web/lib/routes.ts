@@ -41,3 +41,9 @@ export const UNMATCHED_RETURNS_PATH = "/returns/unmatched";
 
 /** Where opening stock is entered and listed. */
 export const OPENING_STOCK_PATH = "/bills/opening-stock/new";
+
+/** Where the cylinders were on a day. */
+export const STOCK_REPORT_PATH = "/reports/stock";
+
+/** What came into the shop and went out of it on a day. */
+export const DAY_LEDGER_PATH = "/reports/ledger";

@@ -1,4 +1,6 @@
 import {
+  dayLedgerQuerySchema,
+  dayLedgerSchema,
   partyListQuerySchema,
   partyReportSchema,
   pendingReturnListQuerySchema,
@@ -9,12 +11,18 @@ import {
 import type { FastifyInstance } from "fastify";
 import type { AppDependencies } from "../app";
 import { parseRequest } from "../refusal";
+import { reportDayLedger } from "../services/day-ledger";
 import { reportParties } from "../services/party-report";
 import { listPendingReturns } from "../services/pending";
 import { reportStock } from "../services/stock-report";
 
 /** Reports only read, and every staff member may see them. */
 export function reportRoutes(app: FastifyInstance, { db, clock }: AppDependencies): void {
+  app.get("/api/reports/ledger", async (request) => {
+    const { date } = parseRequest(dayLedgerQuerySchema, request.query);
+    return dayLedgerSchema.parse(await reportDayLedger(db, clock, date));
+  });
+
   app.get("/api/reports/parties", async (request) => {
     const query = parseRequest(partyListQuerySchema, request.query);
     return partyReportSchema.parse(await reportParties(db, query));

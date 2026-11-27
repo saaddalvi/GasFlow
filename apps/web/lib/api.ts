@@ -5,6 +5,7 @@ import {
   billSchema,
   closedRowListSchema,
   dailySummarySchema,
+  dayLedgerSchema,
   splitSchema,
   gasListSchema,
   openingStockListSchema,
@@ -36,6 +37,8 @@ import {
   type ClosedRowListQuery,
   type DailySummary,
   type DailySummaryQuery,
+  type DayLedger,
+  type DayLedgerQuery,
   type Split,
   type SplitQuery,
   type GasList,
@@ -207,6 +210,12 @@ export async function fetchOpeningStockParties(): Promise<OpeningStockParties> {
 export async function fetchStockReport({ date }: StockReportQuery): Promise<StockReport> {
   const query = new URLSearchParams(date ? { date } : {});
   return stockReportSchema.parse(await getJson(`/api/reports/stock?${query}`));
+}
+
+/** The day ledger for the date, or for today if none is given. */
+export async function fetchDayLedger({ date }: DayLedgerQuery): Promise<DayLedger> {
+  const query = new URLSearchParams(date ? { date } : {});
+  return dayLedgerSchema.parse(await getJson(`/api/reports/ledger?${query}`));
 }
 
 /** Today's date in India. */
