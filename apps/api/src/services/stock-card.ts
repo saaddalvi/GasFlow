@@ -1,6 +1,7 @@
 import {
   CARD_FIGURES,
   financialYearStart,
+  monthsBetween,
   type BillType,
   type StockCard,
   type StockCardBill,
@@ -100,20 +101,6 @@ function firstDate(
   }
   const wanted = first ?? financialYearStart(to);
   return startDate && wanted < startDate ? startDate : wanted;
-}
-
-/** Each month from the first date's to the last's, such as "2026-11", if they are in order. */
-function monthsBetween(from: string, to: string): string[] {
-  if (from > to) {
-    return [];
-  }
-  const months: string[] = [];
-  const moment = new Date(`${from.slice(0, 7)}-01`);
-  while (moment.toISOString().slice(0, 7) <= to.slice(0, 7)) {
-    months.push(moment.toISOString().slice(0, 7));
-    moment.setUTCMonth(moment.getUTCMonth() + 1);
-  }
-  return months;
 }
 
 /** The items under each key, the keys and the items in the order they come. */

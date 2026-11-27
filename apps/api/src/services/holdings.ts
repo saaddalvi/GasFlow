@@ -1,5 +1,6 @@
 import {
   firstOfMonth,
+  lastOfMonth,
   type DailySummary,
   type DailySummaryQuery,
   type PartyHolding,
@@ -148,10 +149,7 @@ export function heldBy(holdings: Pick<Holding, "gasId" | "gasName" | "quantity">
 
 /** The first and last days of the date's month. */
 function monthOf(date: string): { from: string; to: string } {
-  const [year, month] = date.split("-").map(Number) as [number, number];
-  // Day 0 of the month after is this month's last.
-  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  return { from: firstOfMonth(date), to: `${date.slice(0, 7)}-${last}` };
+  return { from: firstOfMonth(date), to: lastOfMonth(date) };
 }
 
 // The types of bill that send cylinders to a party, and that bring them back.

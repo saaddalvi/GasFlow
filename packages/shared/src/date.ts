@@ -52,6 +52,33 @@ export function addDays(date: string, days: number): string {
   return moved.toISOString().slice(0, 10);
 }
 
+/** The last day of the month the date is in. */
+export function lastOfMonth(date: string): string {
+  const [year, month] = date.split("-").map(Number) as [number, number];
+  // Day 0 of the month after is this month's last.
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
+
+/** Each month from the first date's to the last's, such as "2026-11", if they are in order. */
+export function monthsBetween(from: string, to: string): string[] {
+  if (from > to) {
+    return [];
+  }
+  const months: string[] = [];
+  const moment = new Date(firstOfMonth(from));
+  while (moment.toISOString().slice(0, 7) <= to.slice(0, 7)) {
+    months.push(moment.toISOString().slice(0, 7));
+    moment.setUTCMonth(moment.getUTCMonth() + 1);
+  }
+  return months;
+}
+
+/** The days from one date to another, fewer than none if the other is earlier. */
+export function daysBetween(from: string, to: string): number {
+  // Both are midnight UTC, so the difference is whole days.
+  return (Date.parse(to) - Date.parse(from)) / 86_400_000;
+}
+
 /** The first day of the financial year the date is in, which begins on 1 April. */
 export function financialYearStart(date: string): string {
   const year = Number(date.slice(0, 4));

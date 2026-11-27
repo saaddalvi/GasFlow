@@ -16,6 +16,7 @@ import type {
   ReturnCounts,
   StockCardMatchedBill,
 } from "@gasflow/shared";
+import { daysBetween } from "@gasflow/shared";
 import { today, type Clock } from "../clock";
 import type { Database, Transaction } from "../database";
 import { fromDatabaseDate } from "../database-date";
@@ -570,12 +571,8 @@ async function countingDaysOut(db: Database, clock: Clock) {
   const limit = await getOverdueLimit(db);
   const now = today(clock);
   return (billDate: string) => {
-    const daysOut = daysBetween(billDate, now);
+    // A date that has not come yet is no days ago.
+    const daysOut = Math.max(0, daysBetween(billDate, now));
     return { daysOut, overdue: daysOut > limit };
   };
-}
-
-/** The days from one date to a later one. A date that has not come yet is no days ago. */
-function daysBetween(from: string, to: string): number {
-  return Math.max(0, (Date.parse(to) - Date.parse(from)) / 86_400_000);
 }
