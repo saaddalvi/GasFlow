@@ -47,3 +47,6 @@ export const STOCK_REPORT_PATH = "/reports/stock";
 
 /** What came into the shop and went out of it on a day. */
 export const DAY_LEDGER_PATH = "/reports/ledger";
+
+/** What every customer and refiller held on a day. */
+export const BALANCE_REGISTER_PATH = "/reports/party-balance";

@@ -35,10 +35,15 @@ export interface Holding {
 
 /**
  * What each of these customers and refillers holds of each gas it has any of, in
- * the order of the gases, counting every posted bill whatever its date. Fill state
- * counts only for the shop, so it is added across. Anyone else holds nothing here.
+ * the order of the gases, counting every posted bill dated no later than the date,
+ * or whatever its date if none is given. Fill state counts only for the shop, so it
+ * is added across. Anyone else holds nothing here.
  */
-export function findHoldings(db: Database | Transaction, partyIds: string[]): Promise<Holding[]> {
+export function findHoldings(
+  db: Database | Transaction,
+  partyIds: string[],
+  date?: string,
+): Promise<Holding[]> {
   return db.$queryRaw<Holding[]>`
     SELECT m.party_id AS "partyId", g.id AS "gasId", g.name::text AS "gasName",
            SUM(m.quantity)::int AS quantity
@@ -46,6 +51,7 @@ export function findHoldings(db: Database | Transaction, partyIds: string[]): Pr
       JOIN parties p ON p.id = m.party_id AND p.type IN ('customer', 'refiller')
       JOIN gases g ON g.id = m.gas_id
      WHERE m.party_id = ANY(${partyIds}::uuid[])
+       AND m.date <= COALESCE(${date ?? null}::date, m.date)
      GROUP BY m.party_id, g.id
     HAVING SUM(m.quantity) <> 0
      ORDER BY g.sort_order, g.name

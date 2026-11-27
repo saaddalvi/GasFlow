@@ -87,6 +87,23 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     return vehicleSchema.parse(response.json());
   }
 
+  /** So many cylinders of the named gas, as a holding lists them. */
+  const held = (name: string, quantity: number) => ({
+    gas: { id: gas(name).id, name },
+    quantity,
+  });
+
+  async function deactivate(party: { id: string }) {
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/parties/${party.id}`,
+      headers: staff.headers,
+      payload: { active: false },
+    });
+    expect(response.statusCode).toBe(200);
+    return partySchema.parse(response.json());
+  }
+
   /** The lines as a request carries them. */
   const asLines = (lines: Line[]) =>
     lines.map(({ gas: name, fillState = "filled", quantity }) => ({
@@ -452,6 +469,8 @@ export async function startAgency({ startDate = START_DATE }: { startDate?: stri
     gas,
     addParty,
     addVehicle,
+    held,
+    deactivate,
     asLines,
     postOpeningStock,
     enter,

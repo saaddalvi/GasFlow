@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import {
+  balanceRegisterSchema,
   billListSchema,
   billNumberUseSchema,
   billSchema,
@@ -27,6 +28,8 @@ import {
   todaySchema,
   unmatchedListSchema,
   vehicleListSchema,
+  type BalanceRegister,
+  type BalanceRegisterQuery,
   type Bill,
   type BillList,
   type BillListQuery,
@@ -69,6 +72,7 @@ import {
   type VehicleList,
 } from "@gasflow/shared";
 import { refresh } from "next/cache";
+import { balanceRegisterSearch } from "./balance-register-search";
 import { billListSearch } from "./bill-list-search";
 import { partyListSearch } from "./party-list-search";
 
@@ -216,6 +220,12 @@ export async function fetchStockReport({ date }: StockReportQuery): Promise<Stoc
 export async function fetchDayLedger({ date }: DayLedgerQuery): Promise<DayLedger> {
   const query = new URLSearchParams(date ? { date } : {});
   return dayLedgerSchema.parse(await getJson(`/api/reports/ledger?${query}`));
+}
+
+/** What customers and refillers held on the date asked for, or today if none is given. */
+export async function fetchBalanceRegister(query: BalanceRegisterQuery): Promise<BalanceRegister> {
+  const path = `/api/reports/party-balance?${balanceRegisterSearch(query)}`;
+  return balanceRegisterSchema.parse(await getJson(path));
 }
 
 /** Today's date in India. */

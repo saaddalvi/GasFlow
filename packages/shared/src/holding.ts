@@ -14,6 +14,14 @@ export const gasHeldSchema = z.object({
 
 export type GasHeld = z.infer<typeof gasHeldSchema>;
 
+/**
+ * Whether there are fewer than none of some gas, whatever the total, which means
+ * that bills are missing or wrong.
+ */
+export function isBelowZero({ gases }: { gases: GasHeld[] }): boolean {
+  return gases.some(({ quantity }) => quantity < 0);
+}
+
 /** What went out to a party and what came back, of every gas together. */
 const movementSchema = z.object({
   /** By dispatch to a customer, or send to a refiller. */

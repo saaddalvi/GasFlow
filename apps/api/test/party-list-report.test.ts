@@ -1,4 +1,4 @@
-import { partyReportSchema, partySchema } from "@gasflow/shared";
+import { partyReportSchema } from "@gasflow/shared";
 import { expect, test } from "vitest";
 import { startAgency } from "./support/agency";
 
@@ -8,7 +8,7 @@ import { startAgency } from "./support/agency";
 /** The agency, with the means to read the party list as its page shows it. */
 async function start() {
   const agency = await startAgency();
-  const { app, staff, get, gas } = agency;
+  const { get } = agency;
 
   /** One page of the party list, for a query such as "type=customer". */
   async function partyReport(query = "") {
@@ -17,24 +17,7 @@ async function start() {
     return partyReportSchema.parse(response.json());
   }
 
-  /** So many cylinders of the named gas, as a holding lists them. */
-  const held = (name: string, quantity: number) => ({
-    gas: { id: gas(name).id, name },
-    quantity,
-  });
-
-  async function deactivate(party: { id: string }) {
-    const response = await app.inject({
-      method: "PATCH",
-      url: `/api/parties/${party.id}`,
-      headers: staff.headers,
-      payload: { active: false },
-    });
-    expect(response.statusCode).toBe(200);
-    return partySchema.parse(response.json());
-  }
-
-  return { ...agency, partyReport, held, deactivate };
+  return { ...agency, partyReport };
 }
 
 const NONE = {
