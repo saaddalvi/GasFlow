@@ -195,6 +195,67 @@ pnpm --filter @gasflow/api run db:generate
 
 Commit the new folder under `apps/api/prisma/migrations`.
 
+## Deploying
+
+| Part     | Host               | Region    | Set up by              |
+| -------- | ------------------ | --------- | ---------------------- |
+| Web app  | Vercel, Hobby plan | Singapore | `apps/web/vercel.json` |
+| API      | Render, free plan  | Singapore | `render.yaml`          |
+| Database | Neon               | Singapore | the Neon console       |
+
+Vercel's Hobby plan permits only
+[personal or non-commercial use](https://vercel.com/legal/terms).
+
+Until there is a domain, use the keys of Clerk's **development** instance, as a
+production instance needs a domain you own. That makes the deployment a trial:
+do not enter real records. Anyone can reach its sign-in page, so first give every
+account there a strong password that is used nowhere else.
+
+Enter keys and connection strings only in the hosts' settings. Never commit them.
+
+### First deployment
+
+The hosts build from GitHub, so push these files first.
+
+1. **Neon:** create a project in AWS Singapore with Postgres 17. Copy its
+   **direct** connection string, the one without `-pooler` in the host name.
+2. **Render:** choose **New**, then **Blueprint**, and connect the repository.
+   When asked, give `DATABASE_URL` (from Neon) and `CLERK_SECRET_KEY`. The first
+   build creates the tables, the shop and the starting gases. Note the service's
+   address.
+3. **Vercel:** import the repository with **Root Directory** `apps/web` and set
+   **Node.js Version** to 24.x. Add these variables for Production, then deploy
+   (redeploy if the first build ran without them):
+
+   | Variable                             | Value                        |
+   | ------------------------------------ | ---------------------------- |
+   | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`  | from Clerk                   |
+   | `CLERK_SECRET_KEY`                   | from Clerk                   |
+   | `API_URL`                            | the Render service's address |
+   | `NEXT_PUBLIC_CLERK_KEYLESS_DISABLED` | `true`                       |
+   | `ENABLE_EXPERIMENTAL_COREPACK`       | `1`, for the pinned pnpm     |
+
+4. **Render:** set `CLERK_AUTHORIZED_PARTIES` to the web app's address, such as
+   `https://gasflow.vercel.app`, with no `/` at the end.
+5. Sign in. If the Clerk instance has no admin,
+   [create the first admin](#create-the-first-admin).
+
+### Later deployments
+
+A push to `main` deploys both. Render waits for CI to pass; Vercel does not, so
+for a few minutes the web app can be ahead of the API.
+
+Render's build applies new migrations and runs the seed. The database changes
+before the new API takes over, so a migration must not break the version still
+running.
+
+### Waking the API
+
+Render's free plan
+[stops the API](https://render.com/docs/free) after 15 minutes without requests
+and takes about a minute to start it again. The first page after a quiet spell is
+slow, and may fail.
+
 ## Stopping
 
 `Ctrl+C` stops the apps. `pnpm db:down` stops Postgres and keeps its data;

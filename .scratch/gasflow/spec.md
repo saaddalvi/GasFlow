@@ -127,7 +127,7 @@ Returns are recorded on a single screen, Receive empties: staff pick the custome
 - Monorepo with a Next.js (App Router, TypeScript, Tailwind) web app, a Fastify API, PostgreSQL through Prisma with raw SQL for reports, and a shared package of Zod schemas used by both apps. The API is the authority on all validation and rules.
 - Clerk handles authentication. The API verifies the session token on every request, rejects anything unauthenticated, and never takes a staff identity from the request body.
 - Identity provider access (token verification, account creation, password reset, access removal) and the clock each sit behind one replaceable interface in the API.
-- Hosting is Vercel for the web app and API and Neon for the database, in the region closest to the shop. Local development uses Postgres in Docker. Database recovery relies on Neon's recovery features. Check current plan pricing; Vercel's free plan does not permit commercial use.
+- Hosting is Vercel for the web app, Render for the API and Neon for the database, in the region closest to the shop. Local development uses Postgres in Docker. Database recovery relies on Neon's recovery features. On 28 November 2026 the project owner chose Vercel's free Hobby plan, stating that the project is not commercial. That plan permits only personal or non-commercial use, so change plans before any commercial use.
 - No tenancy: no firm keys, subdomains or organizations.
 - Business logic lives in service modules, not in route handlers.
 

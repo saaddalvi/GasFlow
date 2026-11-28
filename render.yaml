@@ -1,0 +1,35 @@
+# The API on Render, as a Blueprint. The web app is on Vercel
+# (apps/web/vercel.json) and the database on Neon. See "Deploying" in the README.
+services:
+  - type: web
+    name: gasflow-api
+    runtime: node
+    plan: free
+    # The same region as the database. It cannot be changed once the service exists.
+    region: singapore
+    # Render's free plan has no pre-deploy step, so the build updates the database.
+    # If a migration fails, the build fails and the running version stays up.
+    # Corepack gets the pnpm version named in package.json.
+    buildCommand: >-
+      corepack pnpm install --frozen-lockfile --filter "@gasflow/api..." &&
+      corepack pnpm --filter @gasflow/api run db:migrate &&
+      corepack pnpm --filter @gasflow/api run db:seed
+    # Without pnpm, so that waking up does not wait for it to be fetched.
+    startCommand: cd apps/api && node --import tsx src/server.ts
+    # Waits for CI to pass on a push to main.
+    autoDeployTrigger: checksPass
+    envVars:
+      # Render sends requests to this address and port.
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: API_PORT
+        value: "10000"
+      # Entered in the Render dashboard, never here.
+      # Neon's direct connection string, without "-pooler" in the host name.
+      - key: DATABASE_URL
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      # The web app's address, such as https://gasflow.vercel.app
+      - key: CLERK_AUTHORIZED_PARTIES
+        sync: false
