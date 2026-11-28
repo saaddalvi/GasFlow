@@ -49,3 +49,29 @@ Still to check once deployed:
 - Sign in, and save a bill.
 - Open the app after the API has been idle for over 15 minutes.
 - The checks noted in earlier tickets for go-live: `citext` on Neon, and many saves at once over the Neon connection.
+
+**28 November 2026: trial deployment running.**
+
+- Neon, Render and Vercel are on their free plans, with the database in Singapore. Sign-in uses Clerk's development instance. The addresses are left out, as this repository is public.
+- Render created the API from `render.yaml`, from commit `12cb0df`. Vercel built the web app from the same commit.
+- The first web deployment could not load any figures: `API_URL` held the Render service's ID, not its address. The project owner corrected it and redeployed, and reported the app working.
+- The Neon database is Postgres 18. All 833 tests passed on a local Postgres 18.
+
+Checked:
+
+- After the API's first build, the database had all 19 migrations, one shop, 10 gases and the `citext` extension.
+- The API answered a signed-out request and a made-up token with `401`.
+- Signed-out visits to the web app ended at the sign-in page, which was served from Singapore.
+- After the correction, one staff record was in the database, there were no bills, and the web app's logs showed no errors in the entries read.
+
+Still to do:
+
+- The web app's functions were running Node 26, not 24. Set 24.x in Vercel and redeploy.
+- Confirm that both builds used pnpm 11, and that the API runs Node 24.
+- Confirm that `CLERK_AUTHORIZED_PARTIES` is set in Render.
+- Confirm that the development admin's password has been changed.
+- Save a bill.
+- Open the app after the API has been idle for over 15 minutes.
+- Try many saves at once over the Neon connection.
+- Try a restore on Neon, whose free plan keeps 6 hours of history here.
+- A domain, the production Clerk instance, an account without an email there, and the client's logo, gas list changes, number prefixes and start date.
