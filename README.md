@@ -217,28 +217,38 @@ Enter keys and connection strings only in the hosts' settings. Never commit them
 
 The hosts build from GitHub, so push these files first.
 
-1. **Neon:** create a project in AWS Singapore with Postgres 17. Copy its
-   **direct** connection string, the one without `-pooler` in the host name.
-2. **Render:** choose **New**, then **Blueprint**, and connect the repository.
-   When asked, give `DATABASE_URL` (from Neon) and `CLERK_SECRET_KEY`. The first
-   build creates the tables, the shop and the starting gases. Note the service's
-   address.
-3. **Vercel:** import the repository with **Root Directory** `apps/web` and set
-   **Node.js Version** to 24.x. Add these variables for Production, then deploy
-   (redeploy if the first build ran without them):
+1. **Neon:** create a project in AWS Singapore with Postgres 17 or 18 (local
+   development and CI use 17). Copy its **direct** connection string, the one
+   without `-pooler` in the host name. For a database made through Vercel, that
+   is `DATABASE_URL_UNPOOLED`, under **Storage**. Do not connect the database to
+   the web project, which has no use for it.
+2. **Render:** choose **New**, then **Blueprint**, and connect the repository. Do
+   not create a **Web Service** by hand, which starts on a paid plan. When asked,
+   give `DATABASE_URL` (from Neon) and `CLERK_SECRET_KEY`, and leave
+   `CLERK_AUTHORIZED_PARTIES` empty. The first build creates the tables, the shop
+   and the starting gases. Note the service's address, which starts `https://`
+   and ends `.onrender.com`.
+3. **Vercel:** import the repository with **Root Directory** `apps/web`, and skip
+   the Clerk integration it offers. Add these variables:
 
-   | Variable                             | Value                        |
-   | ------------------------------------ | ---------------------------- |
-   | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`  | from Clerk                   |
-   | `CLERK_SECRET_KEY`                   | from Clerk                   |
-   | `API_URL`                            | the Render service's address |
-   | `NEXT_PUBLIC_CLERK_KEYLESS_DISABLED` | `true`                       |
-   | `ENABLE_EXPERIMENTAL_COREPACK`       | `1`, for the pinned pnpm     |
+   | Variable                             | Value                                                                    |
+   | ------------------------------------ | ------------------------------------------------------------------------ |
+   | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`  | from Clerk                                                               |
+   | `CLERK_SECRET_KEY`                   | from Clerk                                                               |
+   | `API_URL`                            | the Render service's `https://` address, not its ID, which starts `srv-` |
+   | `NEXT_PUBLIC_CLERK_KEYLESS_DISABLED` | `true`                                                                   |
+   | `ENABLE_EXPERIMENTAL_COREPACK`       | `1`, for the pinned pnpm                                                 |
 
-4. **Render:** set `CLERK_AUTHORIZED_PARTIES` to the web app's address, such as
-   `https://gasflow.vercel.app`, with no `/` at the end.
+   In the project's **Settings**, under **Build and Deployment**, set **Node.js
+   Version** to 24.x and save. Then deploy. A change to a variable or a setting
+   takes effect only on the next deployment.
+
+4. **Render:** set `CLERK_AUTHORIZED_PARTIES` to the address people will use for
+   the web app, such as `https://gasflow.vercel.app`, with no `/` at the end. The
+   API then refuses sign-ins made at any other address.
 5. Sign in. If the Clerk instance has no admin,
-   [create the first admin](#create-the-first-admin).
+   [create the first admin](#create-the-first-admin). If the dashboard says its
+   figures could not be loaded, the web app's logs in Vercel say why.
 
 ### Later deployments
 
